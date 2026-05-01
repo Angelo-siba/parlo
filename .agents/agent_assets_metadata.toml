@@ -1,0 +1,14 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "74S42q8k9XpPKvpU07paZ"
+uri = "file://artifacts/parlo/SUPABASE_SETUP.md"
+type = "text"
+title = "Supabase setup SQL"
+
+[[outputs]]
+id = "ghx4uKfwXBptuIwlBtHmM"
+uri = "file://exports/parlo.zip"
+type = "unspecified"
+title = "parlo.zip — full project source"
