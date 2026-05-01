@@ -19,6 +19,7 @@ export const STORAGE_BUCKET = "parlo-files";
 
 export type Project = {
   id: string;
+  user_id: string;
   name: string;
   client_name: string;
   client_email: string;

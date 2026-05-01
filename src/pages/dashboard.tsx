@@ -26,6 +26,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase, Project, ProjectFile } from "@/lib/supabase";
+import { useAuth } from "@/lib/auth";
 
 type ProjectWithStats = Project & {
   fileCount: number;
@@ -40,6 +41,7 @@ function generateShareToken() {
 }
 
 export default function Dashboard() {
+  const { user, signOut } = useAuth();
   const [projects, setProjects] = useState<ProjectWithStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -50,10 +52,12 @@ export default function Dashboard() {
   const { toast } = useToast();
 
   async function loadProjects() {
+    if (!user) return;
     setLoading(true);
     const { data: projectsData, error } = await supabase
       .from("projects")
       .select("*")
+      .eq("user_id", user.id)
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -101,7 +105,8 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadProjects();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -114,6 +119,7 @@ export default function Dashboard() {
       client_email: clientEmail.trim(),
       status: "active",
       share_token,
+      user_id: user!.id,
     });
     setSubmitting(false);
     if (error) {
@@ -137,7 +143,11 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header subtitle="Freelancer dashboard" />
+      <Header
+        subtitle="Freelancer dashboard"
+        onLogout={signOut}
+        userEmail={user?.email}
+      />
       <main className="max-w-6xl mx-auto px-6 py-10">
         <div className="flex items-end justify-between mb-8 flex-wrap gap-4">
           <div>
