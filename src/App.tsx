@@ -7,12 +7,13 @@ import Dashboard from "@/pages/dashboard";
 import ProjectDetail from "@/pages/project-detail";
 import ClientPortal from "@/pages/client-portal";
 import AuthPage from "@/pages/auth";
+import ResetPasswordPage from "@/pages/reset-password";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
 
 function ProtectedRouter() {
-  const { user, loading } = useAuth();
+  const { user, loading, isRecovery } = useAuth();
   const [location] = useLocation();
 
   if (loading) {
@@ -21,6 +22,10 @@ function ProtectedRouter() {
         Loading…
       </div>
     );
+  }
+
+  if (isRecovery) {
+    return <ResetPasswordPage />;
   }
 
   const isClientRoute = location.startsWith("/client/");
