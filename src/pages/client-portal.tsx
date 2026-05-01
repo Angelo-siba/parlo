@@ -14,7 +14,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { supabase, Project, ProjectFile } from "@/lib/supabase";
+import { supabase, Project, ProjectFile, logActivity } from "@/lib/supabase";
 
 function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -80,6 +80,11 @@ export default function ClientPortal() {
       });
       return;
     }
+    await logActivity(
+      file.project_id,
+      "file_approved",
+      `Client approved: ${file.file_name}`,
+    );
     toast({ title: "Approved — thanks!" });
     load();
   }
@@ -101,6 +106,11 @@ export default function ClientPortal() {
       });
       return;
     }
+    await logActivity(
+      file.project_id,
+      "feedback_submitted",
+      `Client left feedback on: ${file.file_name}`,
+    );
     toast({ title: "Feedback sent" });
     setFeedbackDrafts((d) => ({ ...d, [file.id]: "" }));
     load();

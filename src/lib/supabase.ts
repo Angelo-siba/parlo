@@ -39,3 +39,27 @@ export type ProjectFile = {
   feedback: string | null;
   created_at: string;
 };
+
+export type ActivityEventType =
+  | "file_uploaded"
+  | "file_deleted"
+  | "file_approved"
+  | "feedback_submitted";
+
+export type ActivityLog = {
+  id: string;
+  project_id: string;
+  event_type: ActivityEventType;
+  description: string;
+  created_at: string;
+};
+
+export async function logActivity(
+  projectId: string,
+  eventType: ActivityEventType,
+  description: string,
+) {
+  await supabase
+    .from("activity_log")
+    .insert({ project_id: projectId, event_type: eventType, description });
+}

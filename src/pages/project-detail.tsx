@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useRoute } from "wouter";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import {
   ArrowLeft,
   Upload,
@@ -12,6 +12,8 @@ import {
   Clock,
   Mail,
   ExternalLink,
+  MessageSquare,
+  Activity,
 } from "lucide-react";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
@@ -23,7 +25,10 @@ import {
   STORAGE_BUCKET,
   Project,
   ProjectFile,
+  ActivityLog,
+  logActivity,
 } from "@/lib/supabase";
+import { useAuth } from "@/lib/auth";
 
 function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -31,11 +36,35 @@ function formatBytes(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
 }
 
+const EVENT_META: Record<
+  ActivityLog["event_type"],
+  { icon: React.ReactNode; color: string }
+> = {
+  file_uploaded: {
+    icon: <Upload className="h-3.5 w-3.5" />,
+    color: "bg-blue-100 text-blue-700",
+  },
+  file_deleted: {
+    icon: <Trash2 className="h-3.5 w-3.5" />,
+    color: "bg-red-100 text-red-700",
+  },
+  file_approved: {
+    icon: <CheckCircle2 className="h-3.5 w-3.5" />,
+    color: "bg-emerald-100 text-emerald-700",
+  },
+  feedback_submitted: {
+    icon: <MessageSquare className="h-3.5 w-3.5" />,
+    color: "bg-primary/10 text-primary",
+  },
+};
+
 export default function ProjectDetail() {
   const [, params] = useRoute("/projects/:id");
   const projectId = params?.id;
+  const { user, signOut } = useAuth();
   const [project, setProject] = useState<Project | null>(null);
   const [files, setFiles] = useState<ProjectFile[]>([]);
+  const [activity, setActivity] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -45,15 +74,24 @@ export default function ProjectDetail() {
   async function loadAll() {
     if (!projectId) return;
     setLoading(true);
-    const [{ data: p, error: pErr }, { data: f, error: fErr }] =
-      await Promise.all([
-        supabase.from("projects").select("*").eq("id", projectId).single(),
-        supabase
-          .from("files")
-          .select("*")
-          .eq("project_id", projectId)
-          .order("created_at", { ascending: false }),
-      ]);
+    const [
+      { data: p, error: pErr },
+      { data: f, error: fErr },
+      { data: a },
+    ] = await Promise.all([
+      supabase.from("projects").select("*").eq("id", projectId).single(),
+      supabase
+        .from("files")
+        .select("*")
+        .eq("project_id", projectId)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("activity_log")
+        .select("*")
+        .eq("project_id", projectId)
+        .order("created_at", { ascending: false })
+        .limit(50),
+    ]);
     if (pErr) {
       toast({
         title: "Couldn't load project",
@@ -72,6 +110,7 @@ export default function ProjectDetail() {
     } else {
       setFiles((f ?? []) as ProjectFile[]);
     }
+    setActivity((a ?? []) as ActivityLog[]);
     setLoading(false);
   }
 
@@ -115,6 +154,12 @@ export default function ProjectDetail() {
           description: insErr.message,
           variant: "destructive",
         });
+      } else {
+        await logActivity(
+          project.id,
+          "file_uploaded",
+          `File uploaded: ${file.name}`,
+        );
       }
     }
 
@@ -148,6 +193,13 @@ export default function ProjectDetail() {
       });
       return;
     }
+    if (project) {
+      await logActivity(
+        project.id,
+        "file_deleted",
+        `File deleted: ${file.file_name}`,
+      );
+    }
     toast({ title: "File deleted" });
     loadAll();
   }
@@ -166,7 +218,9 @@ export default function ProjectDetail() {
 
   function emailClientLink() {
     if (!project) return "";
-    const subject = encodeURIComponent(`Files ready for your review: ${project.name}`);
+    const subject = encodeURIComponent(
+      `Files ready for your review: ${project.name}`,
+    );
     const body = encodeURIComponent(
       `Hi ${project.client_name},\n\nThe files for ${project.name} are ready for your review.\n\nReview here: ${shareUrl()}\n\nThanks!`,
     );
@@ -176,7 +230,7 @@ export default function ProjectDetail() {
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
-        <Header />
+        <Header onLogout={signOut} userEmail={user?.email} />
         <div className="max-w-5xl mx-auto px-6 py-12 text-muted-foreground">
           Loading project…
         </div>
@@ -187,7 +241,7 @@ export default function ProjectDetail() {
   if (!project) {
     return (
       <div className="min-h-screen bg-background">
-        <Header />
+        <Header onLogout={signOut} userEmail={user?.email} />
         <div className="max-w-5xl mx-auto px-6 py-12">
           <p className="text-muted-foreground">Project not found.</p>
           <Link href="/">
@@ -206,7 +260,7 @@ export default function ProjectDetail() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header subtitle="Project" />
+      <Header subtitle="Project" onLogout={signOut} userEmail={user?.email} />
       <main className="max-w-5xl mx-auto px-6 py-8">
         <Link href="/" data-testid="link-back">
           <Button variant="ghost" size="sm" className="mb-4 -ml-3">
@@ -390,6 +444,58 @@ export default function ProjectDetail() {
             ))}
           </div>
         )}
+
+        {/* Activity log */}
+        <div className="mt-10">
+          <div className="flex items-center gap-2 mb-4">
+            <Activity className="h-5 w-5 text-muted-foreground" />
+            <h2 className="text-xl font-semibold">Activity</h2>
+            {activity.length > 0 && (
+              <span className="text-sm text-muted-foreground">
+                {activity.length} event{activity.length !== 1 ? "s" : ""}
+              </span>
+            )}
+          </div>
+
+          {activity.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4">
+              No activity yet. Events will appear here as you upload files and
+              your client reviews them.
+            </p>
+          ) : (
+            <div className="relative">
+              <div className="absolute left-[13px] top-2 bottom-2 w-px bg-border" />
+              <div className="space-y-4">
+                {activity.map((ev) => {
+                  const meta = EVENT_META[ev.event_type];
+                  return (
+                    <div key={ev.id} className="flex gap-4 items-start">
+                      <div
+                        className={`relative z-10 h-7 w-7 rounded-full flex items-center justify-center flex-shrink-0 ${meta.color}`}
+                      >
+                        {meta.icon}
+                      </div>
+                      <div className="flex-1 min-w-0 pt-0.5">
+                        <p className="text-sm leading-snug">{ev.description}</p>
+                        <p
+                          className="text-xs text-muted-foreground mt-0.5"
+                          title={format(
+                            new Date(ev.created_at),
+                            "MMM d, yyyy 'at' h:mm a",
+                          )}
+                        >
+                          {formatDistanceToNow(new Date(ev.created_at), {
+                            addSuffix: true,
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
       </main>
     </div>
   );
