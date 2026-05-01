@@ -124,6 +124,9 @@ export default function ProjectDetail() {
     if (!fileList || fileList.length === 0 || !project) return;
     setUploading(true);
 
+    let succeeded = 0;
+    let failed = 0;
+
     for (const file of Array.from(fileList)) {
       const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
       const path = `${project.id}/${Date.now()}_${safe}`;
@@ -136,6 +139,7 @@ export default function ProjectDetail() {
           description: upErr.message,
           variant: "destructive",
         });
+        failed++;
         continue;
       }
       const { data: pub } = supabase.storage
@@ -154,18 +158,32 @@ export default function ProjectDetail() {
           description: insErr.message,
           variant: "destructive",
         });
+        failed++;
       } else {
         await logActivity(
           project.id,
           "file_uploaded",
           `File uploaded: ${file.name}`,
         );
+        succeeded++;
       }
     }
 
     setUploading(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
-    toast({ title: "Upload complete" });
+
+    if (succeeded > 0 && failed === 0) {
+      toast({
+        title: `${succeeded === 1 ? "File" : `${succeeded} files`} uploaded successfully`,
+      });
+    } else if (succeeded > 0 && failed > 0) {
+      toast({
+        title: `${succeeded} uploaded, ${failed} failed`,
+        variant: "destructive",
+      });
+    }
+    // If all failed, individual error toasts already shown — no extra toast needed
+
     loadAll();
   }
 
