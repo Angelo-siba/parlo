@@ -25,6 +25,8 @@ import {
   STORAGE_BUCKET,
   Project,
   ProjectFile,
+  ProjectStatus,
+  PROJECT_STATUSES,
   ActivityLog,
   logActivity,
 } from "@/lib/supabase";
@@ -67,6 +69,7 @@ export default function ProjectDetail() {
   const [activity, setActivity] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
   const [copied, setCopied] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -222,6 +225,22 @@ export default function ProjectDetail() {
     loadAll();
   }
 
+  async function handleStatusChange(newStatus: ProjectStatus) {
+    if (!project || updatingStatus) return;
+    setUpdatingStatus(true);
+    const { error } = await supabase
+      .from("projects")
+      .update({ status: newStatus })
+      .eq("id", project.id);
+    setUpdatingStatus(false);
+    if (error) {
+      toast({ title: "Couldn't update status", description: error.message, variant: "destructive" });
+    } else {
+      setProject({ ...project, status: newStatus });
+      toast({ title: `Status set to ${PROJECT_STATUSES.find((s) => s.value === newStatus)?.label}` });
+    }
+  }
+
   function shareUrl() {
     if (!project) return "";
     return `${window.location.origin}${import.meta.env.BASE_URL}client/${project.share_token}`;
@@ -289,9 +308,31 @@ export default function ProjectDetail() {
 
         <div className="flex items-start justify-between flex-wrap gap-4 mb-2">
           <div>
-            <h1 className="text-3xl font-semibold tracking-tight">
-              {project.name}
-            </h1>
+            <div className="flex items-center gap-3 flex-wrap">
+              <h1 className="text-3xl font-semibold tracking-tight">
+                {project.name}
+              </h1>
+              <select
+                value={project.status}
+                disabled={updatingStatus}
+                onChange={(e) => handleStatusChange(e.target.value as ProjectStatus)}
+                className={`text-xs font-medium rounded-full border px-3 py-1 cursor-pointer outline-none transition-opacity ${updatingStatus ? "opacity-50" : ""} ${
+                  project.status === "draft"
+                    ? "bg-gray-100 text-gray-600 border-gray-200"
+                    : project.status === "active"
+                    ? "bg-blue-50 text-blue-700 border-blue-200"
+                    : project.status === "completed"
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                    : "bg-muted text-muted-foreground border-border"
+                }`}
+              >
+                {PROJECT_STATUSES.map((s) => (
+                  <option key={s.value} value={s.value}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+            </div>
             <p className="text-muted-foreground mt-1 flex items-center gap-2">
               <Mail className="h-4 w-4" />
               {project.client_name} · {project.client_email}

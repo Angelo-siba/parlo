@@ -25,7 +25,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { supabase, Project, ProjectFile } from "@/lib/supabase";
+import { supabase, Project, ProjectFile, ProjectStatus, PROJECT_STATUSES } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 
 type ProjectWithStats = Project & {
@@ -276,18 +276,21 @@ export default function Dashboard() {
                 <Card className="hover-elevate cursor-pointer h-full">
                   <CardHeader>
                     <div className="flex items-start justify-between gap-2">
-                      <CardTitle className="text-lg">{p.name}</CardTitle>
+                      <div className="flex items-center gap-2 flex-wrap min-w-0">
+                        <CardTitle className="text-lg">{p.name}</CardTitle>
+                        <StatusBadge status={p.status} />
+                      </div>
                       {p.pendingCount > 0 ? (
                         <Badge
                           variant="secondary"
-                          className="bg-primary/10 text-primary border-primary/20"
+                          className="bg-primary/10 text-primary border-primary/20 shrink-0"
                         >
                           {p.pendingCount} pending
                         </Badge>
                       ) : p.fileCount > 0 ? (
-                        <Badge variant="outline">All approved</Badge>
+                        <Badge variant="outline" className="shrink-0">All approved</Badge>
                       ) : (
-                        <Badge variant="outline">No files</Badge>
+                        <Badge variant="outline" className="shrink-0">No files</Badge>
                       )}
                     </div>
                   </CardHeader>
@@ -309,6 +312,24 @@ export default function Dashboard() {
         )}
       </main>
     </div>
+  );
+}
+
+const STATUS_STYLES: Record<ProjectStatus, string> = {
+  draft:     "bg-gray-100 text-gray-600 border-gray-200",
+  active:    "bg-blue-50 text-blue-700 border-blue-200",
+  completed: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  archived:  "bg-muted text-muted-foreground border-border",
+};
+
+function StatusBadge({ status }: { status: ProjectStatus }) {
+  const label = PROJECT_STATUSES.find((s) => s.value === status)?.label ?? status;
+  return (
+    <span
+      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[status] ?? STATUS_STYLES.active}`}
+    >
+      {label}
+    </span>
   );
 }
 
