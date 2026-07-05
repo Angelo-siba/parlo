@@ -63,6 +63,25 @@ export type ActivityLog = {
   created_at: string;
 };
 
+export type InvoiceLineItem = {
+  description: string;
+  amount: number;
+};
+
+export type InvoiceStatus = "draft" | "sent" | "paid";
+
+export type Invoice = {
+  id: string;
+  project_id: string;
+  invoice_number: string;
+  line_items: InvoiceLineItem[];
+  total_amount: number;
+  due_date: string;
+  paypal_email: string;
+  status: InvoiceStatus;
+  created_at: string;
+};
+
 export async function logActivity(
   projectId: string,
   eventType: ActivityEventType,

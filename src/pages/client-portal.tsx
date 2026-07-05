@@ -7,6 +7,8 @@ import {
   FileIcon,
   MessageSquare,
   Download,
+  Receipt,
+  ExternalLink,
 } from "lucide-react";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
@@ -14,7 +16,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { supabase, Project, ProjectFile, logActivity } from "@/lib/supabase";
+import {
+  supabase,
+  Project,
+  ProjectFile,
+  Invoice,
+  logActivity,
+} from "@/lib/supabase";
 
 function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -27,11 +35,13 @@ export default function ClientPortal() {
   const token = params?.token;
   const [project, setProject] = useState<Project | null>(null);
   const [files, setFiles] = useState<ProjectFile[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [feedbackDrafts, setFeedbackDrafts] = useState<Record<string, string>>(
     {},
   );
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [payingId, setPayingId] = useState<string | null>(null);
   const { toast } = useToast();
 
   async function load() {
@@ -54,7 +64,47 @@ export default function ClientPortal() {
       .eq("project_id", (p as Project).id)
       .order("created_at", { ascending: false });
     setFiles((f ?? []) as ProjectFile[]);
+    const { data: inv } = await supabase
+      .from("invoices")
+      .select("*")
+      .eq("project_id", (p as Project).id)
+      .neq("status", "draft")
+      .order("created_at", { ascending: false });
+    setInvoices((inv ?? []) as Invoice[]);
     setLoading(false);
+  }
+
+  function payPalLink(inv: Invoice) {
+    if (!project) return "#";
+    const params = new URLSearchParams({
+      cmd: "_xclick",
+      business: inv.paypal_email,
+      item_name: `${inv.invoice_number} — ${project.name}`,
+      amount: inv.total_amount.toFixed(2),
+      currency_code: "USD",
+      no_shipping: "1",
+    });
+    return `https://www.paypal.com/cgi-bin/webscr?${params.toString()}`;
+  }
+
+  async function payNow(inv: Invoice) {
+    setPayingId(inv.id);
+    window.open(payPalLink(inv), "_blank", "noopener,noreferrer");
+    const { error } = await supabase
+      .from("invoices")
+      .update({ status: "paid" })
+      .eq("id", inv.id);
+    setPayingId(null);
+    if (error) {
+      toast({
+        title: "Couldn't update invoice status",
+        description: error.message,
+        variant: "destructive",
+      });
+      return;
+    }
+    toast({ title: "Opening PayPal — thanks!" });
+    load();
   }
 
   useEffect(() => {
@@ -300,6 +350,65 @@ export default function ClientPortal() {
                 </Card>
               );
             })}
+          </div>
+        )}
+
+        {invoices.length > 0 && (
+          <div className="mt-10">
+            <div className="flex items-center gap-2 mb-4">
+              <Receipt className="h-5 w-5 text-muted-foreground" />
+              <h2 className="text-xl font-semibold">Invoices</h2>
+            </div>
+            <div className="space-y-4">
+              {invoices.map((inv) => (
+                <Card key={inv.id} data-testid={`card-client-invoice-${inv.id}`}>
+                  <CardContent className="py-5">
+                    <div className="flex items-start justify-between gap-4 flex-wrap">
+                      <div className="min-w-0">
+                        <div className="font-medium">{inv.invoice_number}</div>
+                        <div className="text-xs text-muted-foreground mt-0.5">
+                          Due {format(new Date(inv.due_date), "MMM d, yyyy")}
+                        </div>
+                        <div className="mt-3 space-y-1">
+                          {inv.line_items.map((item, i) => (
+                            <div
+                              key={i}
+                              className="flex items-center justify-between gap-4 text-sm text-muted-foreground"
+                            >
+                              <span className="truncate">{item.description}</span>
+                              <span className="font-mono">
+                                ${item.amount.toFixed(2)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="flex items-center justify-between gap-4 text-sm font-semibold pt-2 mt-2 border-t border-border/60">
+                          <span>Total</span>
+                          <span>${inv.total_amount.toFixed(2)}</span>
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                        {inv.status === "paid" ? (
+                          <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 hover:bg-emerald-100">
+                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                            Paid
+                          </Badge>
+                        ) : (
+                          <Button
+                            onClick={() => payNow(inv)}
+                            disabled={payingId === inv.id}
+                            data-testid={`button-pay-now-${inv.id}`}
+                          >
+                            <ExternalLink className="h-4 w-4 mr-2" />
+                            Pay Now
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           </div>
         )}
 

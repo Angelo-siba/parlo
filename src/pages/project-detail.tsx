@@ -14,11 +14,25 @@ import {
   ExternalLink,
   MessageSquare,
   Activity,
+  Receipt,
+  Plus,
+  X,
 } from "lucide-react";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import {
   supabase,
@@ -28,6 +42,8 @@ import {
   ProjectStatus,
   PROJECT_STATUSES,
   ActivityLog,
+  Invoice,
+  InvoiceLineItem,
   logActivity,
 } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
@@ -67,12 +83,22 @@ export default function ProjectDetail() {
   const [project, setProject] = useState<Project | null>(null);
   const [files, setFiles] = useState<ProjectFile[]>([]);
   const [activity, setActivity] = useState<ActivityLog[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [copied, setCopied] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+
+  const [invoiceOpen, setInvoiceOpen] = useState(false);
+  const [invoiceSubmitting, setInvoiceSubmitting] = useState(false);
+  const [invoiceNumber, setInvoiceNumber] = useState("");
+  const [lineItems, setLineItems] = useState<InvoiceLineItem[]>([
+    { description: "", amount: 0 },
+  ]);
+  const [dueDate, setDueDate] = useState("");
+  const [paypalEmail, setPaypalEmail] = useState("");
 
   async function loadAll() {
     if (!projectId) return;
@@ -81,6 +107,7 @@ export default function ProjectDetail() {
       { data: p, error: pErr },
       { data: f, error: fErr },
       { data: a },
+      { data: inv },
     ] = await Promise.all([
       supabase.from("projects").select("*").eq("id", projectId).single(),
       supabase
@@ -94,6 +121,11 @@ export default function ProjectDetail() {
         .eq("project_id", projectId)
         .order("created_at", { ascending: false })
         .limit(50),
+      supabase
+        .from("invoices")
+        .select("*")
+        .eq("project_id", projectId)
+        .order("created_at", { ascending: false }),
     ]);
     if (pErr) {
       toast({
@@ -114,6 +146,7 @@ export default function ProjectDetail() {
       setFiles((f ?? []) as ProjectFile[]);
     }
     setActivity((a ?? []) as ActivityLog[]);
+    setInvoices((inv ?? []) as Invoice[]);
     setLoading(false);
   }
 
@@ -121,6 +154,74 @@ export default function ProjectDetail() {
     loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
+
+  function openInvoiceDialog() {
+    const next = invoices.length + 1;
+    setInvoiceNumber(`INV-${String(next).padStart(4, "0")}`);
+    setLineItems([{ description: "", amount: 0 }]);
+    setDueDate("");
+    setPaypalEmail("");
+    setInvoiceOpen(true);
+  }
+
+  function updateLineItem(
+    index: number,
+    field: keyof InvoiceLineItem,
+    value: string,
+  ) {
+    setLineItems((items) =>
+      items.map((item, i) =>
+        i === index
+          ? {
+              ...item,
+              [field]: field === "amount" ? Number(value) || 0 : value,
+            }
+          : item,
+      ),
+    );
+  }
+
+  function addLineItem() {
+    setLineItems((items) => [...items, { description: "", amount: 0 }]);
+  }
+
+  function removeLineItem(index: number) {
+    setLineItems((items) => items.filter((_, i) => i !== index));
+  }
+
+  const invoiceTotal = lineItems.reduce(
+    (sum, item) => sum + (Number(item.amount) || 0),
+    0,
+  );
+
+  async function handleCreateInvoice(e: React.FormEvent) {
+    e.preventDefault();
+    if (!project) return;
+    const validItems = lineItems.filter((i) => i.description.trim());
+    if (validItems.length === 0 || !dueDate || !paypalEmail.trim()) return;
+    setInvoiceSubmitting(true);
+    const { error } = await supabase.from("invoices").insert({
+      project_id: project.id,
+      invoice_number: invoiceNumber,
+      line_items: validItems,
+      total_amount: invoiceTotal,
+      due_date: dueDate,
+      paypal_email: paypalEmail.trim(),
+      status: "sent",
+    });
+    setInvoiceSubmitting(false);
+    if (error) {
+      toast({
+        title: "Couldn't create invoice",
+        description: error.message,
+        variant: "destructive",
+      });
+      return;
+    }
+    toast({ title: "Invoice created and shared with client" });
+    setInvoiceOpen(false);
+    loadAll();
+  }
 
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const fileList = e.target.files;
@@ -339,6 +440,131 @@ export default function ProjectDetail() {
             </p>
           </div>
           <div className="flex gap-2">
+            <Dialog open={invoiceOpen} onOpenChange={setInvoiceOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  onClick={openInvoiceDialog}
+                  data-testid="button-create-invoice"
+                >
+                  <Receipt className="h-4 w-4 mr-2" />
+                  Create Invoice
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-lg">
+                <DialogHeader>
+                  <DialogTitle>Create invoice</DialogTitle>
+                  <DialogDescription>
+                    Shared with {project.client_name} on the client portal.
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleCreateInvoice} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="invoiceNumber">Invoice number</Label>
+                    <Input
+                      id="invoiceNumber"
+                      value={invoiceNumber}
+                      onChange={(e) => setInvoiceNumber(e.target.value)}
+                      data-testid="input-invoice-number"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Line items</Label>
+                    <div className="space-y-2">
+                      {lineItems.map((item, i) => (
+                        <div key={i} className="flex items-center gap-2">
+                          <Input
+                            placeholder="Description"
+                            value={item.description}
+                            onChange={(e) =>
+                              updateLineItem(i, "description", e.target.value)
+                            }
+                            className="flex-1"
+                            data-testid={`input-line-item-desc-${i}`}
+                          />
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            placeholder="0.00"
+                            value={item.amount || ""}
+                            onChange={(e) =>
+                              updateLineItem(i, "amount", e.target.value)
+                            }
+                            className="w-28"
+                            data-testid={`input-line-item-amount-${i}`}
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeLineItem(i)}
+                            disabled={lineItems.length === 1}
+                            data-testid={`button-remove-line-item-${i}`}
+                          >
+                            <X className="h-4 w-4 text-muted-foreground" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={addLineItem}
+                      data-testid="button-add-line-item"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add line item
+                    </Button>
+                  </div>
+
+                  <div className="flex items-center justify-between text-sm font-medium pt-2 border-t border-border/60">
+                    <span>Total</span>
+                    <span data-testid="text-invoice-total">
+                      ${invoiceTotal.toFixed(2)}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="dueDate">Due date</Label>
+                      <Input
+                        id="dueDate"
+                        type="date"
+                        value={dueDate}
+                        onChange={(e) => setDueDate(e.target.value)}
+                        required
+                        data-testid="input-due-date"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="paypalEmail">PayPal email</Label>
+                      <Input
+                        id="paypalEmail"
+                        type="email"
+                        placeholder="you@paypal.com"
+                        value={paypalEmail}
+                        onChange={(e) => setPaypalEmail(e.target.value)}
+                        required
+                        data-testid="input-paypal-email"
+                      />
+                    </div>
+                  </div>
+
+                  <DialogFooter>
+                    <Button
+                      type="submit"
+                      disabled={invoiceSubmitting || invoiceTotal <= 0}
+                      data-testid="button-submit-invoice"
+                    >
+                      {invoiceSubmitting ? "Creating…" : "Create invoice"}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
             <a href={emailClientLink()}>
               <Button variant="outline" data-testid="button-email-client">
                 <Mail className="h-4 w-4 mr-2" />
@@ -503,6 +729,67 @@ export default function ProjectDetail() {
             ))}
           </div>
         )}
+
+        {/* Invoices */}
+        <div className="mt-10">
+          <div className="flex items-center gap-2 mb-4">
+            <Receipt className="h-5 w-5 text-muted-foreground" />
+            <h2 className="text-xl font-semibold">Invoices</h2>
+            {invoices.length > 0 && (
+              <span className="text-sm text-muted-foreground">
+                {invoices.length} invoice{invoices.length !== 1 ? "s" : ""}
+              </span>
+            )}
+          </div>
+          {invoices.length === 0 ? (
+            <Card className="border-dashed">
+              <CardContent className="py-10 text-center">
+                <Receipt className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                <p className="text-muted-foreground text-sm">
+                  No invoices yet. Create one to get paid via PayPal.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {invoices.map((inv) => (
+                <Card key={inv.id} data-testid={`card-invoice-${inv.id}`}>
+                  <CardContent className="py-4">
+                    <div className="flex items-center justify-between gap-4 flex-wrap">
+                      <div>
+                        <div className="font-medium">{inv.invoice_number}</div>
+                        <div className="text-xs text-muted-foreground mt-0.5">
+                          Due {format(new Date(inv.due_date), "MMM d, yyyy")} ·{" "}
+                          {inv.line_items.length} line item
+                          {inv.line_items.length !== 1 ? "s" : ""}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="font-semibold">
+                          ${inv.total_amount.toFixed(2)}
+                        </span>
+                        {inv.status === "paid" ? (
+                          <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 hover:bg-emerald-100">
+                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                            Paid
+                          </Badge>
+                        ) : (
+                          <Badge
+                            variant="secondary"
+                            className="bg-primary/10 text-primary border-primary/20"
+                          >
+                            <Clock className="h-3 w-3 mr-1" />
+                            Awaiting payment
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* Activity log */}
         <div className="mt-10">
