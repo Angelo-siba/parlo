@@ -365,6 +365,17 @@ export default function ProjectDetail() {
     return `mailto:${project.client_email}?subject=${subject}&body=${body}`;
   }
 
+  function invoiceReminderLink(inv: Invoice) {
+    if (!project) return "";
+    const subject = encodeURIComponent(
+      `Reminder: invoice ${inv.invoice_number} for ${project.name}`,
+    );
+    const body = encodeURIComponent(
+      `Hi ${project.client_name},\n\nJust a friendly reminder that invoice ${inv.invoice_number} ($${inv.total_amount.toFixed(2)}) for ${project.name} is due ${format(new Date(inv.due_date), "MMM d, yyyy")}.\n\nYou can view and pay it here: ${shareUrl()}\n\nThanks!`,
+    );
+    return `mailto:${project.client_email}?subject=${subject}&body=${body}`;
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
@@ -774,13 +785,26 @@ export default function ProjectDetail() {
                             Paid
                           </Badge>
                         ) : (
-                          <Badge
-                            variant="secondary"
-                            className="bg-primary/10 text-primary border-primary/20"
-                          >
-                            <Clock className="h-3 w-3 mr-1" />
-                            Awaiting payment
-                          </Badge>
+                          <>
+                            <Badge
+                              variant="secondary"
+                              className="bg-primary/10 text-primary border-primary/20"
+                            >
+                              <Clock className="h-3 w-3 mr-1" />
+                              Awaiting payment
+                            </Badge>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              asChild
+                              data-testid={`button-remind-invoice-${inv.id}`}
+                            >
+                              <a href={invoiceReminderLink(inv)}>
+                                <Mail className="h-4 w-4 mr-1.5" />
+                                Remind
+                              </a>
+                            </Button>
+                          </>
                         )}
                       </div>
                     </div>
