@@ -48,6 +48,9 @@ import {
 } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 
+const MAX_FILE_SIZE_MB = 50;
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+
 function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -226,6 +229,23 @@ export default function ProjectDetail() {
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const fileList = e.target.files;
     if (!fileList || fileList.length === 0 || !project) return;
+
+    const oversized = Array.from(fileList).filter(
+      (file) => file.size > MAX_FILE_SIZE_BYTES,
+    );
+    if (oversized.length > 0) {
+      toast({
+        title:
+          oversized.length === 1
+            ? `${oversized[0].name} is too large`
+            : `${oversized.length} files are too large`,
+        description: `Files must be ${MAX_FILE_SIZE_MB}MB or smaller.`,
+        variant: "destructive",
+      });
+      e.target.value = "";
+      return;
+    }
+
     setUploading(true);
 
     let succeeded = 0;
@@ -653,6 +673,9 @@ export default function ProjectDetail() {
               <Upload className="h-4 w-4 mr-2" />
               {uploading ? "Uploading…" : "Upload files"}
             </Button>
+            <div className="text-xs text-muted-foreground mt-1.5 text-right">
+              Max {MAX_FILE_SIZE_MB}MB per file
+            </div>
           </div>
         </div>
 
