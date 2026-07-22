@@ -1,6 +1,6 @@
 {
   "buildCommand": "pnpm --filter @workspace/parlo run build",
   "outputDirectory": "artifacts/parlo/dist/public",
-  "installCommand": "pnpm install",
+  "installCommand": "npm install -g pnpm@10.26.1 && pnpm install",
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }
