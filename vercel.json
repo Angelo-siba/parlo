@@ -1,6 +1,5 @@
 {
-  "buildCommand": "npx pnpm@10.26.1 --filter @workspace/parlo run build",
-  "outputDirectory": "artifacts/parlo/dist/public",
-  "installCommand": "npx pnpm@10.26.1 install",
+  "buildCommand": "npm install --prefix deploy && npm run build --prefix deploy",
+  "outputDirectory": "deploy/dist",
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }
