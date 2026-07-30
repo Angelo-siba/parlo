@@ -30,8 +30,10 @@ CREATE TABLE IF NOT EXISTS public.freelancer_settings (
 ALTER TABLE public.freelancer_settings ENABLE ROW LEVEL SECURITY;
 
 -- Drop old policies (safe if they don't exist)
-DROP POLICY IF EXISTS "Freelancers manage own settings" ON public.freelancer_settings;
+DROP POLICY IF EXISTS "Freelancers manage own settings"     ON public.freelancer_settings;
 DROP POLICY IF EXISTS "Anyone can read freelancer settings" ON public.freelancer_settings;
+DROP POLICY IF EXISTS "Freelancers insert own settings"     ON public.freelancer_settings;
+DROP POLICY IF EXISTS "Freelancers update own settings"     ON public.freelancer_settings;
 
 -- Anyone (including anon clients) can read branding
 CREATE POLICY "Anyone can read freelancer settings"
@@ -51,7 +53,7 @@ CREATE POLICY "Freelancers update own settings"
   ON public.freelancer_settings
   FOR UPDATE
   TO authenticated
-  USING (user_id = auth.uid())
+  USING  (user_id = auth.uid())
   WITH CHECK (user_id = auth.uid());
 
 -- ============================================================
@@ -60,7 +62,6 @@ CREATE POLICY "Freelancers update own settings"
 -- ============================================================
 DO $$
 BEGIN
-  -- Insert policy for authenticated users uploading to settings/
   IF NOT EXISTS (
     SELECT 1 FROM pg_policies
     WHERE schemaname = 'storage'
