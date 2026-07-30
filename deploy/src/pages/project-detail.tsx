@@ -115,7 +115,9 @@ export default function ProjectDetail() {
       supabase.from("projects").select("*").eq("id", projectId).single(),
       supabase
         .from("files")
-        .select("*")
+        .select(
+          "id, project_id, file_name, file_url, file_size, approved, approved_at, feedback, created_at",
+        )
         .eq("project_id", projectId)
         .order("created_at", { ascending: false }),
       supabase
