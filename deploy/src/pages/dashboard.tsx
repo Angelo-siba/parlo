@@ -228,14 +228,33 @@ export default function Dashboard() {
 
   async function handleSaveSettings(e: React.FormEvent) {
     e.preventDefault();
-    if (!user) return;
     setSavingSettings(true);
 
+    // Explicitly get a fresh session so the Supabase client has a valid JWT
+    // before making any authenticated DB calls. This also handles token
+    // expiry — getSession() refreshes automatically when needed.
+    const {
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession();
+
+    if (sessionError || !session?.user) {
+      toast({
+        title: "Session expired",
+        description: "Please sign in again and retry.",
+        variant: "destructive",
+      });
+      setSavingSettings(false);
+      return;
+    }
+
+    // Use the UUID straight from the live session — never from React state.
+    const userId = session.user.id;
     let logoUrl = settings?.logo_url ?? null;
 
     if (logoFile) {
       const ext = logoFile.name.split(".").pop() ?? "png";
-      const path = `settings/${user.id}/logo.${ext}`;
+      const path = `settings/${userId}/logo.${ext}`;
       const { error: uploadError } = await supabase.storage
         .from(STORAGE_BUCKET)
         .upload(path, logoFile, { upsert: true, contentType: logoFile.type });
@@ -255,7 +274,7 @@ export default function Dashboard() {
     }
 
     const payload = {
-      user_id: user.id,
+      user_id: userId,
       display_name: displayName.trim() || null,
       logo_url: logoUrl,
       accent_color: accentColor,
