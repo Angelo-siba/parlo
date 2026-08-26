@@ -742,7 +742,7 @@ export default function ProjectDetail() {
                             <div className="flex items-center gap-1.5 mb-1">
                               <MessageSquare className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
                               <span className="text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wide">
-                                Client feedback
+                                Client feedback:
                               </span>
                               {feedbackTimestamps[f.file_name] && (
                                 <span className="text-xs text-muted-foreground ml-auto">
