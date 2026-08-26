@@ -9,6 +9,7 @@ export function Header({
   brandLogoUrl,
   brandName,
   brandColor,
+  showUpgrade,
 }: {
   subtitle?: string;
   onLogout?: () => void;
@@ -16,6 +17,7 @@ export function Header({
   brandLogoUrl?: string | null;
   brandName?: string | null;
   brandColor?: string | null;
+  showUpgrade?: boolean;
 }) {
   const accentStyle = brandColor ? { borderBottomColor: brandColor } : {};
 
@@ -58,25 +60,41 @@ export function Header({
           </div>
         </Link>
 
-        {onLogout && (
-          <div className="flex items-center gap-3">
-            {userEmail && (
-              <span className="text-sm text-muted-foreground hidden sm:block truncate max-w-[200px]">
-                {userEmail}
-              </span>
-            )}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onLogout}
-              data-testid="button-logout"
-              className="gap-2"
+        <div className="flex items-center gap-2 sm:gap-4">
+          <nav className="flex items-center gap-2 sm:gap-4">
+            <Link
+              href="/pricing"
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              data-testid="link-pricing"
             >
-              <LogOut className="h-4 w-4" />
-              Sign out
-            </Button>
-          </div>
-        )}
+              Pricing
+            </Link>
+            {showUpgrade && (
+              <Button asChild size="sm" data-testid="button-header-upgrade">
+                <Link href="/pricing">Upgrade to Pro</Link>
+              </Button>
+            )}
+          </nav>
+          {onLogout && (
+            <div className="flex items-center gap-3">
+              {userEmail && (
+                <span className="text-sm text-muted-foreground hidden sm:block truncate max-w-[200px]">
+                  {userEmail}
+                </span>
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onLogout}
+                data-testid="button-logout"
+                className="gap-2"
+              >
+                <LogOut className="h-4 w-4" />
+                Sign out
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );
