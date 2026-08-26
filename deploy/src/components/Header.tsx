@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 import { LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { LEMON_SQUEEZY_CHECKOUT_URL } from "@/lib/billing";
 
 export function Header({
   subtitle,
@@ -62,16 +63,9 @@ export function Header({
 
         <div className="flex items-center gap-2 sm:gap-4">
           <nav className="flex items-center gap-2 sm:gap-4">
-            <Link
-              href="/pricing"
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-              data-testid="link-pricing"
-            >
-              Pricing
-            </Link>
             {showUpgrade && (
               <Button asChild size="sm" data-testid="button-header-upgrade">
-                <Link href="/pricing">Upgrade to Pro</Link>
+                <a href={LEMON_SQUEEZY_CHECKOUT_URL} target="_blank" rel="noreferrer">Upgrade to Pro</a>
               </Button>
             )}
           </nav>
