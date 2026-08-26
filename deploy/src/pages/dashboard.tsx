@@ -13,6 +13,7 @@ import {
   TrendingUp,
   Hourglass,
   Upload,
+  ArrowUpRight,
 } from "lucide-react";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
@@ -41,6 +42,7 @@ import {
   STORAGE_BUCKET,
 } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
+import { FREE_PROJECT_LIMIT, LEMON_SQUEEZY_CHECKOUT_URL, isProUser } from "@/lib/billing";
 
 type ProjectWithStats = Project & {
   fileCount: number;
@@ -58,6 +60,7 @@ const DEFAULT_ACCENT = "#d4521a";
 
 export default function Dashboard() {
   const { user, signOut } = useAuth();
+  const isPro = isProUser(user);
   const [projects, setProjects] = useState<ProjectWithStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -65,6 +68,7 @@ export default function Dashboard() {
   const [name, setName] = useState("");
   const [clientName, setClientName] = useState("");
   const [clientEmail, setClientEmail] = useState("");
+  const [limitDialogOpen, setLimitDialogOpen] = useState(false);
   const { toast } = useToast();
 
   // Revenue
@@ -188,7 +192,37 @@ export default function Dashboard() {
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim() || !clientName.trim() || !clientEmail.trim()) return;
+
+    if (!isPro && projects.length >= FREE_PROJECT_LIMIT) {
+      setOpen(false);
+      setLimitDialogOpen(true);
+      return;
+    }
+
     setSubmitting(true);
+
+    const { count, error: countError } = await supabase
+      .from("projects")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user!.id);
+
+    if (countError) {
+      setSubmitting(false);
+      toast({
+        title: "Couldn't check project limit",
+        description: countError.message,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!isPro && (count ?? 0) >= FREE_PROJECT_LIMIT) {
+      setSubmitting(false);
+      setOpen(false);
+      setLimitDialogOpen(true);
+      return;
+    }
+
     const share_token = generateShareToken();
     const { error } = await supabase.from("projects").insert({
       name: name.trim(),
@@ -312,6 +346,7 @@ export default function Dashboard() {
         subtitle="Freelancer dashboard"
         onLogout={signOut}
         userEmail={user?.email}
+        showUpgrade={!isPro}
       />
       <main className="max-w-6xl mx-auto px-6 py-10">
         <div className="flex items-end justify-between mb-8 flex-wrap gap-4">
@@ -331,7 +366,16 @@ export default function Dashboard() {
               <Settings className="h-4 w-4 mr-2" />
               Brand settings
             </Button>
-            <Dialog open={open} onOpenChange={setOpen}>
+            <Dialog
+              open={open}
+              onOpenChange={(nextOpen) => {
+                if (nextOpen && !isPro && projects.length >= FREE_PROJECT_LIMIT) {
+                  setLimitDialogOpen(true);
+                  return;
+                }
+                setOpen(nextOpen);
+              }}
+            >
               <DialogTrigger asChild>
                 <Button data-testid="button-new-project">
                   <Plus className="mr-2 h-4 w-4" />
@@ -394,6 +438,37 @@ export default function Dashboard() {
             </Dialog>
           </div>
         </div>
+
+        {/* Free plan project limit dialog */}
+        <Dialog open={limitDialogOpen} onOpenChange={setLimitDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Project limit reached</DialogTitle>
+              <DialogDescription>
+                You've reached the free limit. Upgrade to Pro for unlimited projects
+              </DialogDescription>
+            </DialogHeader>
+            <div className="rounded-lg bg-primary/5 border border-primary/20 p-4 text-sm text-muted-foreground">
+              Pro also includes invoicing, brand settings, and priority support for $9/month.
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setLimitDialogOpen(false)}>
+                Maybe later
+              </Button>
+              <Button asChild>
+                <a
+                  href={LEMON_SQUEEZY_CHECKOUT_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  data-testid="button-limit-upgrade"
+                >
+                  Upgrade to Pro
+                  <ArrowUpRight className="h-4 w-4" />
+                </a>
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Brand settings dialog */}
         <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
