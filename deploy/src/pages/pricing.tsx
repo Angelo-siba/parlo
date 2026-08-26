@@ -87,7 +87,7 @@ export default function PricingPage() {
           <Card className="relative flex flex-col overflow-hidden border-primary/50 bg-primary/[0.04] shadow-md">
             <div className="absolute inset-x-0 top-0 h-1 bg-primary" />
             <CardHeader className="pb-6">
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-sm font-medium text-primary">For growing client work</p>
                 <Badge className="bg-primary text-primary-foreground">Less than a coffee a month</Badge>
               </div>
