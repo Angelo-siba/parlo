@@ -26,7 +26,11 @@ const FEATURES = [
 ];
 
 export default function AuthPage() {
-  const [mode, setMode] = useState<Mode>("login");
+  const [mode, setMode] = useState<Mode>(() =>
+    new URLSearchParams(window.location.search).get("mode") === "signup"
+      ? "signup"
+      : "login",
+  );
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
