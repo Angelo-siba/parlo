@@ -3,9 +3,8 @@ import { Link } from "wouter";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Header } from "@/components/Header";
-import { useAuth } from "@/lib/auth";
-import { isProUser, LEMON_SQUEEZY_CHECKOUT_URL } from "@/lib/billing";
+const CHECKOUT_URL =
+  "https://parlo-app.lemonsqueezy.com/checkout/buy/786e5bea-0f95-4612-921a-e33fbd58cde1";
 
 const FREE_FEATURES = [
   "2 active projects",
@@ -36,17 +35,29 @@ function FeatureList({ features }: { features: string[] }) {
 }
 
 export default function PricingPage() {
-  const { user, signOut } = useAuth();
-  const isPro = isProUser(user);
-
   return (
     <div className="min-h-screen bg-background">
-      <Header
-        subtitle="Simple pricing for client work"
-        onLogout={user ? signOut : undefined}
-        userEmail={user?.email}
-        showUpgrade={Boolean(user && !isPro)}
-      />
+      <header className="border-b border-border/60 bg-background/80 backdrop-blur sticky top-0 z-10">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+          <Link href="/" className="flex items-center gap-2" data-testid="link-home">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary font-semibold text-primary-foreground">
+              P
+            </div>
+            <div className="leading-tight">
+              <div className="text-lg font-semibold tracking-tight">Parlo</div>
+              <div className="text-xs text-muted-foreground">Simple pricing for client work</div>
+            </div>
+          </Link>
+          <nav className="flex items-center gap-4">
+            <Link href="/" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
+              Dashboard
+            </Link>
+            <Link href="/pricing" className="text-sm font-medium text-primary" data-testid="link-pricing">
+              Pricing
+            </Link>
+          </nav>
+        </div>
+      </header>
 
       <main className="mx-auto max-w-5xl px-6 py-14 sm:py-20">
         <section className="mx-auto max-w-2xl text-center">
@@ -101,7 +112,7 @@ export default function PricingPage() {
               <FeatureList features={PRO_FEATURES} />
               <Button asChild className="mt-10 w-full">
                 <a
-                  href={LEMON_SQUEEZY_CHECKOUT_URL}
+                  href={CHECKOUT_URL}
                   target="_blank"
                   rel="noreferrer"
                   data-testid="button-upgrade-pro"
