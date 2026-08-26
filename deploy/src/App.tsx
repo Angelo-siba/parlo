@@ -9,6 +9,7 @@ import ClientPortal from "@/pages/client-portal";
 import AuthPage from "@/pages/auth";
 import ResetPasswordPage from "@/pages/reset-password";
 import NotFound from "@/pages/not-found";
+import PricingPage from "@/pages/pricing";
 
 const queryClient = new QueryClient();
 
@@ -29,13 +30,15 @@ function ProtectedRouter() {
   }
 
   const isClientRoute = location.startsWith("/client/");
+  const isPublicRoute = location === "/pricing";
 
-  if (!user && !isClientRoute) {
+  if (!user && !isClientRoute && !isPublicRoute) {
     return <AuthPage />;
   }
 
   return (
     <Switch>
+      <Route path="/pricing" component={PricingPage} />
       <Route path="/" component={Dashboard} />
       <Route path="/projects/:id" component={ProjectDetail} />
       <Route path="/client/:token" component={ClientPortal} />
