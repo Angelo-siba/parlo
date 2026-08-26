@@ -61,8 +61,8 @@ const DEFAULT_ACCENT = "#d4521a";
 export default function Dashboard() {
   const { user, signOut } = useAuth();
   const isPro = isProUser(user);
-  const activeProjectCount = projects.filter((project) => project.status === "active").length;
   const [projects, setProjects] = useState<ProjectWithStats[]>([]);
+  const activeProjectCount = projects.filter((project) => project.status === "active").length;
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
