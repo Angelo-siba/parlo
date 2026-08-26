@@ -61,6 +61,7 @@ const DEFAULT_ACCENT = "#d4521a";
 export default function Dashboard() {
   const { user, signOut } = useAuth();
   const isPro = isProUser(user);
+  const activeProjectCount = projects.filter((project) => project.status === "active").length;
   const [projects, setProjects] = useState<ProjectWithStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -193,7 +194,7 @@ export default function Dashboard() {
     e.preventDefault();
     if (!name.trim() || !clientName.trim() || !clientEmail.trim()) return;
 
-    if (!isPro && projects.length >= FREE_PROJECT_LIMIT) {
+    if (!isPro && activeProjectCount >= FREE_PROJECT_LIMIT) {
       setOpen(false);
       setLimitDialogOpen(true);
       return;
@@ -204,7 +205,8 @@ export default function Dashboard() {
     const { count, error: countError } = await supabase
       .from("projects")
       .select("id", { count: "exact", head: true })
-      .eq("user_id", user!.id);
+      .eq("user_id", user!.id)
+      .eq("status", "active");
 
     if (countError) {
       setSubmitting(false);
@@ -369,7 +371,7 @@ export default function Dashboard() {
             <Dialog
               open={open}
               onOpenChange={(nextOpen) => {
-                if (nextOpen && !isPro && projects.length >= FREE_PROJECT_LIMIT) {
+                if (nextOpen && !isPro && activeProjectCount >= FREE_PROJECT_LIMIT) {
                   setLimitDialogOpen(true);
                   return;
                 }
