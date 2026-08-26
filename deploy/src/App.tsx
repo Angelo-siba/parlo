@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -9,9 +10,23 @@ import ClientPortal from "@/pages/client-portal";
 import AuthPage from "@/pages/auth";
 import ResetPasswordPage from "@/pages/reset-password";
 import NotFound from "@/pages/not-found";
-import PricingPage from "@/pages/pricing";
+const PricingPage = lazy(() => import("@/pages/pricing"));
 
 const queryClient = new QueryClient();
+
+function PricingRoute() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-background flex items-center justify-center text-muted-foreground">
+          Loading pricing…
+        </div>
+      }
+    >
+      <PricingPage />
+    </Suspense>
+  );
+}
 
 function ProtectedRouter() {
   const { user, loading, isRecovery } = useAuth();
@@ -38,7 +53,7 @@ function ProtectedRouter() {
 
   return (
     <Switch>
-      <Route path="/pricing" component={PricingPage} />
+      <Route path="/pricing" component={PricingRoute} />
       <Route path="/" component={Dashboard} />
       <Route path="/projects/:id" component={ProjectDetail} />
       <Route path="/client/:token" component={ClientPortal} />
