@@ -1,5 +1,5 @@
 export const LEMON_SQUEEZY_CHECKOUT_URL =
-  "https://parlo-app.lemonsqueezy.com/checkout/buy/786e5bea-0f95-4612-921a-e33fbd58cde1";
+  "https://parlo-app.lemonsqueezy.com/checkout/buy/66c5275d-e39d-4633-8908-d6959d4b429b";
 
 export const FREE_PROJECT_LIMIT = 2;
 
