@@ -1,0 +1,1 @@
+- [Supabase logo storage RLS](supabase-logo-storage-rls.md) — managed storage tables reject owner-only SQL; unique non-overwrite uploads avoid extra RLS checks.
