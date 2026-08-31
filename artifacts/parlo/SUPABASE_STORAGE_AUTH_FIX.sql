@@ -23,6 +23,14 @@ CREATE POLICY "authenticated upload parlo-files"
   TO authenticated
   WITH CHECK (bucket_id = 'parlo-files');
 
+-- Allow authenticated freelancers to overwrite their existing logo/files
+DROP POLICY IF EXISTS "authenticated update parlo-files" ON storage.objects;
+CREATE POLICY "authenticated update parlo-files"
+  ON storage.objects FOR UPDATE
+  TO authenticated
+  USING (bucket_id = 'parlo-files')
+  WITH CHECK (bucket_id = 'parlo-files');
+
 -- Allow authenticated freelancers to delete files
 CREATE POLICY "authenticated delete parlo-files"
   ON storage.objects FOR DELETE
