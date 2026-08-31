@@ -24,38 +24,33 @@ CREATE POLICY "read parlo-files"
   ON storage.objects FOR SELECT
   USING (bucket_id = 'parlo-files');
 
--- Allow authenticated freelancers to upload logos only inside their own
--- settings/<auth.uid>/ folder. The path used by the app is:
--- settings/<user-id>/logo.<extension>
+-- Allow authenticated freelancers to upload files to Parlo's bucket.
+-- This covers both project files and branding logos.
 CREATE POLICY "authenticated upload parlo-files"
   ON storage.objects FOR INSERT
   TO authenticated
-  WITH CHECK (
-    bucket_id = 'parlo-files'
-    AND name LIKE 'settings/' || auth.uid()::text || '/%'
-  );
+  WITH CHECK (bucket_id = 'parlo-files');
 
 -- `upsert: true` requires UPDATE permission when a logo already exists.
 CREATE POLICY "authenticated update parlo-files"
   ON storage.objects FOR UPDATE
   TO authenticated
-  USING (
-    bucket_id = 'parlo-files'
-    AND name LIKE 'settings/' || auth.uid()::text || '/%'
-  )
-  WITH CHECK (
-    bucket_id = 'parlo-files'
-    AND name LIKE 'settings/' || auth.uid()::text || '/%'
-  );
+  USING (bucket_id = 'parlo-files')
+  WITH CHECK (bucket_id = 'parlo-files');
+
+-- Allow authenticated freelancers to overwrite their existing logo/files
+DROP POLICY IF EXISTS "authenticated update parlo-files" ON storage.objects;
+CREATE POLICY "authenticated update parlo-files"
+  ON storage.objects FOR UPDATE
+  TO authenticated
+  USING (bucket_id = 'parlo-files')
+  WITH CHECK (bucket_id = 'parlo-files');
 
 -- Allow authenticated freelancers to delete files
 CREATE POLICY "authenticated delete parlo-files"
   ON storage.objects FOR DELETE
   TO authenticated
-  USING (
-    bucket_id = 'parlo-files'
-    AND name LIKE 'settings/' || auth.uid()::text || '/%'
-  );
+  USING (bucket_id = 'parlo-files');
 
 -- ============================================================
 -- Also make sure the files and projects tables allow

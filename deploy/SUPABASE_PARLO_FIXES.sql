@@ -77,29 +77,17 @@ CREATE POLICY "authenticated upload parlo-files"
   ON storage.objects
   FOR INSERT
   TO authenticated
-  WITH CHECK (
-    bucket_id = 'parlo-files'
-    AND name LIKE 'settings/' || auth.uid()::text || '/%'
-  );
+  WITH CHECK (bucket_id = 'parlo-files');
 
 CREATE POLICY "authenticated update parlo-files"
   ON storage.objects
   FOR UPDATE
   TO authenticated
-  USING (
-    bucket_id = 'parlo-files'
-    AND name LIKE 'settings/' || auth.uid()::text || '/%'
-  )
-  WITH CHECK (
-    bucket_id = 'parlo-files'
-    AND name LIKE 'settings/' || auth.uid()::text || '/%'
-  );
+  USING (bucket_id = 'parlo-files')
+  WITH CHECK (bucket_id = 'parlo-files');
 
 CREATE POLICY "authenticated delete parlo-files"
   ON storage.objects
   FOR DELETE
   TO authenticated
-  USING (
-    bucket_id = 'parlo-files'
-    AND name LIKE 'settings/' || auth.uid()::text || '/%'
-  );
+  USING (bucket_id = 'parlo-files');
