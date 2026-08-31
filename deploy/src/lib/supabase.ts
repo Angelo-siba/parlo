@@ -13,7 +13,13 @@ if (!rawUrl || !supabaseAnonKey) {
 
 const supabaseUrl = rawUrl.replace(/\/+$/, "");
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+  },
+});
 
 export const STORAGE_BUCKET = "parlo-files";
 

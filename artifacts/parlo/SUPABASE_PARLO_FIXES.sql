@@ -57,31 +57,49 @@ CREATE POLICY "Freelancers update own settings"
   WITH CHECK (user_id = auth.uid());
 
 -- ============================================================
--- FIX 3: Storage — allow authenticated users to upload logos
--- (needed if you only ran the anon storage policies before)
+-- Parlo — Fix logo upload RLS
+-- Run this entire file in the Supabase SQL Editor.
 -- ============================================================
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies
-    WHERE schemaname = 'storage'
-      AND tablename  = 'objects'
-      AND policyname = 'Authenticated upload parlo-files'
-  ) THEN
-    CREATE POLICY "Authenticated upload parlo-files"
-      ON storage.objects
-      FOR INSERT
-      TO authenticated
-      WITH CHECK (bucket_id = 'parlo-files');
-  END IF;
-END $;
 
--- Allow authenticated freelancers to overwrite an existing logo/file when
--- the client uses upsert=true.
+-- The logo upload inserts into storage.objects before the app
+-- upserts public.freelancer_settings. The policies below allow an
+-- authenticated freelancer to manage only their own logo folder.
+
+DROP POLICY IF EXISTS "anon upload parlo-files" ON storage.objects;
+DROP POLICY IF EXISTS "authenticated upload parlo-files" ON storage.objects;
+DROP POLICY IF EXISTS "Authenticated upload parlo-files" ON storage.objects;
+DROP POLICY IF EXISTS "authenticated update parlo-files" ON storage.objects;
 DROP POLICY IF EXISTS "Authenticated update parlo-files" ON storage.objects;
-CREATE POLICY "Authenticated update parlo-files"
+DROP POLICY IF EXISTS "authenticated delete parlo-files" ON storage.objects;
+DROP POLICY IF EXISTS "Authenticated delete parlo-files" ON storage.objects;
+
+CREATE POLICY "authenticated upload parlo-files"
+  ON storage.objects
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (
+    bucket_id = 'parlo-files'
+    AND name LIKE 'settings/' || auth.uid()::text || '/%'
+  );
+
+CREATE POLICY "authenticated update parlo-files"
   ON storage.objects
   FOR UPDATE
   TO authenticated
-  USING (bucket_id = 'parlo-files')
-  WITH CHECK (bucket_id = 'parlo-files');
+  USING (
+    bucket_id = 'parlo-files'
+    AND name LIKE 'settings/' || auth.uid()::text || '/%'
+  )
+  WITH CHECK (
+    bucket_id = 'parlo-files'
+    AND name LIKE 'settings/' || auth.uid()::text || '/%'
+  );
+
+CREATE POLICY "authenticated delete parlo-files"
+  ON storage.objects
+  FOR DELETE
+  TO authenticated
+  USING (
+    bucket_id = 'parlo-files'
+    AND name LIKE 'settings/' || auth.uid()::text || '/%'
+  );

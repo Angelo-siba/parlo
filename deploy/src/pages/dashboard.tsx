@@ -273,8 +273,18 @@ export default function Dashboard() {
       data: { session },
       error: sessionError,
     } = await supabase.auth.getSession();
+    const {
+      data: { user: authenticatedUser },
+      error: userError,
+    } = await supabase.auth.getUser();
 
-    if (sessionError || !session?.user) {
+    if (
+      sessionError ||
+      userError ||
+      !session?.access_token ||
+      !authenticatedUser ||
+      authenticatedUser.id !== session.user.id
+    ) {
       toast({
         title: "Session expired",
         description: "Please sign in again and retry.",
@@ -285,7 +295,7 @@ export default function Dashboard() {
     }
 
     // Use the UUID straight from the live session — never from React state.
-    const userId = session.user.id;
+    const userId = authenticatedUser.id;
     let logoUrl = settings?.logo_url ?? null;
 
     if (logoFile) {
