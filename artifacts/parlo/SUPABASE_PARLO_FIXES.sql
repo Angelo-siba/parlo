@@ -74,4 +74,14 @@ BEGIN
       TO authenticated
       WITH CHECK (bucket_id = 'parlo-files');
   END IF;
-END $$;
+END $;
+
+-- Allow authenticated freelancers to overwrite an existing logo/file when
+-- the client uses upsert=true.
+DROP POLICY IF EXISTS "Authenticated update parlo-files" ON storage.objects;
+CREATE POLICY "Authenticated update parlo-files"
+  ON storage.objects
+  FOR UPDATE
+  TO authenticated
+  USING (bucket_id = 'parlo-files')
+  WITH CHECK (bucket_id = 'parlo-files');
