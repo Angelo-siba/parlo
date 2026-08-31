@@ -268,10 +268,16 @@ export default function Dashboard() {
 
     if (logoFile) {
       const ext = logoFile.name.split(".").pop() ?? "png";
-      const path = `settings/${userId}/logo.${ext}`;
+      // Use a new object for each upload. This avoids Supabase treating the
+      // request as an overwrite, which requires a separate UPDATE RLS policy.
+      const path = `settings/${userId}/logo-${crypto.randomUUID()}.${ext}`;
       const { error: uploadError } = await supabase.storage
         .from(STORAGE_BUCKET)
-        .upload(path, logoFile, { upsert: true, contentType: logoFile.type });
+        .upload(path, logoFile, {
+          upsert: false,
+          contentType: logoFile.type,
+          cacheControl: "3600",
+        });
       if (uploadError) {
         console.error("[Parlo] logo storage upload failed", {
           bucket: STORAGE_BUCKET,
