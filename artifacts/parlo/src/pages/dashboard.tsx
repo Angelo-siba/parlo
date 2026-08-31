@@ -260,6 +260,10 @@ export default function Dashboard() {
 
     // Use the UUID straight from the live session — never from React state.
     const userId = authenticatedUser.id;
+    console.info("[Parlo] branding save authenticated", {
+      userId,
+      hasAccessToken: Boolean(session.access_token),
+    });
     let logoUrl = settings?.logo_url ?? null;
 
     if (logoFile) {
@@ -269,8 +273,13 @@ export default function Dashboard() {
         .from(STORAGE_BUCKET)
         .upload(path, logoFile, { upsert: true, contentType: logoFile.type });
       if (uploadError) {
+        console.error("[Parlo] logo storage upload failed", {
+          bucket: STORAGE_BUCKET,
+          path,
+          error: uploadError,
+        });
         toast({
-          title: "Couldn't upload logo",
+          title: "Couldn't upload logo (storage)",
           description: uploadError.message,
           variant: "destructive",
         });
@@ -298,8 +307,12 @@ export default function Dashboard() {
     setSavingSettings(false);
 
     if (error) {
+      console.error("[Parlo] freelancer_settings upsert failed", {
+        userId,
+        error,
+      });
       toast({
-        title: "Couldn't save settings",
+        title: "Couldn't save settings (database)",
         description: error.message,
         variant: "destructive",
       });
