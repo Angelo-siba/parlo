@@ -7,10 +7,6 @@
 -- policies for the authenticated role.
 -- ============================================================
 
-ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
-GRANT USAGE ON SCHEMA storage TO authenticated;
-GRANT SELECT, INSERT, UPDATE, DELETE ON storage.objects TO authenticated;
-
 -- Drop the old policies, including both capitalization variants that
 -- may have been created by earlier versions of this script.
 DROP POLICY IF EXISTS "anon upload parlo-files"  ON storage.objects;
