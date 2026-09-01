@@ -60,6 +60,74 @@ export type ProjectFile = {
 
 export type FileReviewStatus = "pending" | "changes_requested" | "approved";
 
+const MODERN_FILE_COLUMNS =
+  "id, project_id, file_name, file_url, file_size, approved, approved_at, feedback, review_status, version_group_id, version_number, created_at";
+const LEGACY_FILE_COLUMNS =
+  "id, project_id, file_name, file_url, file_size, approved, approved_at, feedback, created_at";
+
+export function normalizeProjectFiles(rows: any[] | null): ProjectFile[] {
+  return (rows ?? []).map((file) => ({
+    ...file,
+    review_status:
+      file.review_status ??
+      (file.feedback && !file.approved ? "changes_requested" : file.approved ? "approved" : "pending"),
+    version_group_id: file.version_group_id ?? file.id,
+    version_number: file.version_number ?? 1,
+  })) as ProjectFile[];
+}
+
+export async function loadProjectFiles(projectId: string) {
+  const modern = await supabase
+    .from("files")
+    .select(MODERN_FILE_COLUMNS)
+    .eq("project_id", projectId)
+    .order("created_at", { ascending: false });
+
+  if (!modern.error) {
+    return {
+      data: normalizeProjectFiles(modern.data),
+      error: null,
+      usedLegacySchema: false,
+    };
+  }
+
+  const legacy = await supabase
+    .from("files")
+    .select(LEGACY_FILE_COLUMNS)
+    .eq("project_id", projectId)
+    .order("created_at", { ascending: false });
+
+  return {
+    data: normalizeProjectFiles(legacy.data),
+    error: legacy.error,
+    usedLegacySchema: !legacy.error,
+  };
+}
+
+export async function loadAllProjectFiles() {
+  const modern = await supabase
+    .from("files")
+    .select(`id, project_id, approved, feedback, review_status, version_group_id, version_number, created_at`);
+
+  if (!modern.error) {
+    return {
+      data: normalizeProjectFiles(modern.data),
+      error: null,
+      usedLegacySchema: false,
+    };
+  }
+
+  const legacy = await supabase
+    .from("files")
+    .select("id, project_id, approved, feedback, created_at");
+
+  return {
+    data: normalizeProjectFiles(legacy.data),
+    error: legacy.error,
+    usedLegacySchema: !legacy.error,
+  };
+}
+
 export type ActivityEventType =
   | "file_uploaded"
   | "file_version_uploaded"

@@ -48,6 +48,7 @@ import {
   Invoice,
   InvoiceLineItem,
   logActivity,
+  loadProjectFiles,
 } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 
@@ -125,18 +126,12 @@ export default function ProjectDetail() {
     setLoading(true);
     const [
       { data: p, error: pErr },
-      { data: f, error: fErr },
+       fileResult,
       { data: a },
       { data: inv },
     ] = await Promise.all([
       supabase.from("projects").select("*").eq("id", projectId).single(),
-      supabase
-        .from("files")
-        .select(
-          "id, project_id, file_name, file_url, file_size, approved, approved_at, feedback, review_status, version_group_id, version_number, created_at",
-        )
-        .eq("project_id", projectId)
-        .order("created_at", { ascending: false }),
+      loadProjectFiles(projectId),
       supabase
         .from("activity_log")
         .select("*")
@@ -158,14 +153,14 @@ export default function ProjectDetail() {
     } else {
       setProject(p as Project);
     }
-    if (fErr) {
+    if (fileResult.error) {
       toast({
         title: "Couldn't load files",
-        description: fErr.message,
+        description: fileResult.error.message,
         variant: "destructive",
       });
     } else {
-      setFiles((f ?? []) as ProjectFile[]);
+      setFiles(fileResult.data);
     }
     setActivity((a ?? []) as ActivityLog[]);
     setInvoices((inv ?? []) as Invoice[]);

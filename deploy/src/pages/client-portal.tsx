@@ -24,6 +24,7 @@ import {
   Invoice,
   FreelancerSettings,
   logActivity,
+  loadProjectFiles,
 } from "@/lib/supabase";
 
 function formatBytes(bytes: number) {
@@ -107,13 +108,7 @@ export default function ClientPortal() {
     setProject(proj);
 
     const [{ data: f }, { data: inv }, { data: brand }] = await Promise.all([
-      supabase
-        .from("files")
-        .select(
-          "id, project_id, file_name, file_url, file_size, approved, approved_at, feedback, review_status, version_group_id, version_number, created_at",
-        )
-        .eq("project_id", proj.id)
-        .order("created_at", { ascending: false }),
+      loadProjectFiles(proj.id),
       supabase
         .from("invoices")
         .select("*")

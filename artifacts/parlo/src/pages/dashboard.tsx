@@ -39,6 +39,7 @@ import {
   Invoice,
   FreelancerSettings,
   STORAGE_BUCKET,
+  loadAllProjectFiles,
 } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 
@@ -101,9 +102,7 @@ export default function Dashboard() {
       return;
     }
 
-    const { data: filesData } = await supabase
-      .from("files")
-      .select("id, project_id, approved, review_status, version_group_id, version_number");
+    const { data: filesData } = await loadAllProjectFiles();
 
     const stats = new Map<
       string,
