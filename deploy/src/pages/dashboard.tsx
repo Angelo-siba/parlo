@@ -108,20 +108,36 @@ export default function Dashboard() {
 
     const { data: filesData } = await supabase
       .from("files")
-      .select("project_id, approved");
+      .select("id, project_id, approved, review_status, version_group_id, version_number");
 
     const stats = new Map<
       string,
       { fileCount: number; pendingCount: number; approvedCount: number }
     >();
-    (filesData ?? []).forEach((f: Pick<ProjectFile, "project_id" | "approved">) => {
+    const latestByGroup = new Map<string, ProjectFile>();
+    (filesData ?? []).forEach((f: ProjectFile) => {
+      const groupKey = `${f.project_id}:${f.version_group_id ?? f.id}`;
+      const existing = latestByGroup.get(groupKey);
+      if (
+        !existing ||
+        (f.version_number ?? 1) > (existing.version_number ?? 1)
+      ) {
+        latestByGroup.set(groupKey, f);
+      }
+    });
+    latestByGroup.forEach((f) => {
       const cur = stats.get(f.project_id) ?? {
         fileCount: 0,
         pendingCount: 0,
         approvedCount: 0,
       };
       cur.fileCount++;
-      if (f.approved) cur.approvedCount++;
+      if (
+        (f.review_status ?? (f.approved ? "approved" : "pending")) ===
+        "approved"
+      ) {
+        cur.approvedCount++;
+      }
       else cur.pendingCount++;
       stats.set(f.project_id, cur);
     });

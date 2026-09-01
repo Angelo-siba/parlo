@@ -17,6 +17,9 @@ import {
   Receipt,
   Plus,
   X,
+  Bell,
+  History,
+  RefreshCw,
 } from "lucide-react";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
@@ -65,6 +68,10 @@ const EVENT_META: Record<
     icon: <Upload className="h-3.5 w-3.5" />,
     color: "bg-blue-100 text-blue-700",
   },
+  file_version_uploaded: {
+    icon: <History className="h-3.5 w-3.5" />,
+    color: "bg-violet-100 text-violet-700",
+  },
   file_deleted: {
     icon: <Trash2 className="h-3.5 w-3.5" />,
     color: "bg-red-100 text-red-700",
@@ -76,6 +83,14 @@ const EVENT_META: Record<
   feedback_submitted: {
     icon: <MessageSquare className="h-3.5 w-3.5" />,
     color: "bg-primary/10 text-primary",
+  },
+  changes_requested: {
+    icon: <RefreshCw className="h-3.5 w-3.5" />,
+    color: "bg-amber-100 text-amber-700",
+  },
+  client_reminder_sent: {
+    icon: <Bell className="h-3.5 w-3.5" />,
+    color: "bg-sky-100 text-sky-700",
   },
 };
 
@@ -89,9 +104,11 @@ export default function ProjectDetail() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [versioningFileId, setVersioningFileId] = useState<string | null>(null);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [copied, setCopied] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const versionFileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   const [invoiceOpen, setInvoiceOpen] = useState(false);
@@ -116,7 +133,7 @@ export default function ProjectDetail() {
       supabase
         .from("files")
         .select(
-          "id, project_id, file_name, file_url, file_size, approved, approved_at, feedback, created_at",
+          "id, project_id, file_name, file_url, file_size, approved, approved_at, feedback, review_status, version_group_id, version_number, created_at",
         )
         .eq("project_id", projectId)
         .order("created_at", { ascending: false }),
@@ -289,6 +306,8 @@ export default function ProjectDetail() {
         file_url: pub.publicUrl,
         file_size: file.size,
         approved: false,
+        review_status: "pending",
+        version_number: 1,
       });
       if (insErr) {
         toast({
@@ -322,6 +341,89 @@ export default function ProjectDetail() {
     }
     // If all failed, individual error toasts already shown — no extra toast needed
 
+    loadAll();
+  }
+
+  async function handleVersionUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    const source = files.find((candidate) => candidate.id === versioningFileId);
+    if (!file || !source || !project) return;
+
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      toast({
+        title: `${file.name} is too large`,
+        description: `Files must be ${MAX_FILE_SIZE_MB}MB or smaller.`,
+        variant: "destructive",
+      });
+      e.target.value = "";
+      return;
+    }
+
+    setUploading(true);
+    const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const path = `${project.id}/${Date.now()}_${safe}`;
+    const { error: uploadError } = await supabase.storage
+      .from(STORAGE_BUCKET)
+      .upload(path, file, { upsert: false });
+
+    if (uploadError) {
+      toast({
+        title: `Version upload failed: ${file.name}`,
+        description: uploadError.message,
+        variant: "destructive",
+      });
+      setUploading(false);
+      setVersioningFileId(null);
+      e.target.value = "";
+      return;
+    }
+
+    const { data: pub } = supabase.storage
+      .from(STORAGE_BUCKET)
+      .getPublicUrl(path);
+    const groupId = source.version_group_id ?? source.id;
+    const nextVersion =
+      Math.max(
+        0,
+        ...files
+          .filter(
+            (candidate) =>
+              (candidate.version_group_id ?? candidate.id) === groupId,
+          )
+          .map((candidate) => candidate.version_number ?? 1),
+      ) + 1;
+
+    const { error: insertError } = await supabase.from("files").insert({
+      project_id: project.id,
+      file_name: file.name,
+      file_url: pub.publicUrl,
+      file_size: file.size,
+      approved: false,
+      approved_at: null,
+      feedback: null,
+      review_status: "pending",
+      version_group_id: groupId,
+      version_number: nextVersion,
+    });
+
+    if (insertError) {
+      toast({
+        title: `Couldn't save version ${nextVersion}`,
+        description: insertError.message,
+        variant: "destructive",
+      });
+    } else {
+      await logActivity(
+        project.id,
+        "file_version_uploaded",
+        `Uploaded version ${nextVersion}: ${file.name}`,
+      );
+      toast({ title: `Version ${nextVersion} uploaded` });
+    }
+
+    setUploading(false);
+    setVersioningFileId(null);
+    e.target.value = "";
     loadAll();
   }
 
@@ -399,6 +501,64 @@ export default function ProjectDetail() {
     return `mailto:${project.client_email}?subject=${subject}&body=${body}`;
   }
 
+  function reminderEmailLink() {
+    if (!project) return "";
+    const pendingFiles = visibleFiles.filter(
+      (file) =>
+        (file.review_status ?? (file.approved ? "approved" : "pending")) !==
+        "approved",
+    );
+    const changesRequested = visibleFiles.filter(
+      (file) => file.review_status === "changes_requested",
+    );
+    const overdueInvoices = invoices.filter(
+      (invoice) =>
+        invoice.status !== "paid" &&
+        new Date(invoice.due_date).getTime() < Date.now(),
+    );
+    const lastNonReminderActivity = activity.find(
+      (event) => event.event_type !== "client_reminder_sent",
+    );
+    const inactiveDays = Math.floor(
+      (Date.now() -
+        new Date(
+          lastNonReminderActivity?.created_at ?? project.created_at,
+        ).getTime()) /
+        (1000 * 60 * 60 * 24),
+    );
+    const reasons = [
+      pendingFiles.length > 0
+        ? `${pendingFiles.length} file${pendingFiles.length === 1 ? "" : "s"} waiting for review`
+        : "",
+      changesRequested.length > 0
+        ? `${changesRequested.length} file${changesRequested.length === 1 ? "" : "s"} with requested changes`
+        : "",
+      overdueInvoices.length > 0
+        ? `${overdueInvoices.length} overdue invoice${overdueInvoices.length === 1 ? "" : "s"}`
+        : "",
+      inactiveDays >= 14 ? `no project activity in ${inactiveDays} days` : "",
+    ].filter(Boolean);
+    const reminderDetails =
+      reasons.length > 0
+        ? `Here are the items that need your attention:\n${reasons.map((reason) => `• ${reason}`).join("\n")}`
+        : "Please take a quick look at the project when you have a moment.";
+    const subject = encodeURIComponent(`Reminder: files ready for review — ${project.name}`);
+    const body = encodeURIComponent(
+      `Hi ${project.client_name},\n\nJust a friendly reminder about ${project.name}.\n\n${reminderDetails}\n\nReview the project here: ${shareUrl()}\n\nThanks!`,
+    );
+    return `mailto:${project.client_email}?subject=${subject}&body=${body}`;
+  }
+
+  async function handleSendReminder() {
+    if (!project) return;
+    await logActivity(
+      project.id,
+      "client_reminder_sent",
+      `Review reminder sent to ${project.client_name}`,
+    );
+    window.location.href = reminderEmailLink();
+  }
+
   function invoiceReminderLink(inv: Invoice) {
     if (!project) return "";
     const subject = encodeURIComponent(
@@ -409,6 +569,30 @@ export default function ProjectDetail() {
     );
     return `mailto:${project.client_email}?subject=${subject}&body=${body}`;
   }
+
+  const fileGroups = useMemo(() => {
+    const groups = new Map<string, ProjectFile[]>();
+    for (const file of files) {
+      const groupId = file.version_group_id ?? file.id;
+      const group = groups.get(groupId) ?? [];
+      group.push(file);
+      groups.set(groupId, group);
+    }
+    return Array.from(groups.values())
+      .map((group) =>
+        group.sort(
+          (a, b) =>
+            (b.version_number ?? 1) - (a.version_number ?? 1) ||
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+        ),
+      )
+      .sort(
+        (a, b) =>
+          new Date(b[0].created_at).getTime() -
+          new Date(a[0].created_at).getTime(),
+      );
+  }, [files]);
+  const visibleFiles = fileGroups.map((group) => group[0]);
 
   if (loading) {
     return (
@@ -438,8 +622,10 @@ export default function ProjectDetail() {
     );
   }
 
-  const pendingCount = files.filter((f) => !f.approved).length;
-  const approvedCount = files.length - pendingCount;
+  const pendingCount = visibleFiles.filter(
+    (f) => (f.review_status ?? (f.approved ? "approved" : "pending")) !== "approved",
+  ).length;
+  const approvedCount = visibleFiles.length - pendingCount;
 
   return (
     <div className="min-h-screen bg-background">
@@ -616,6 +802,14 @@ export default function ProjectDetail() {
                 Email client
               </Button>
             </a>
+            <Button
+              variant="outline"
+              onClick={handleSendReminder}
+              data-testid="button-send-reminder"
+            >
+              <Bell className="h-4 w-4 mr-2" />
+              Send reminder
+            </Button>
           </div>
         </div>
 
@@ -679,6 +873,13 @@ export default function ProjectDetail() {
               onChange={handleUpload}
               data-testid="input-file-upload"
             />
+            <input
+              ref={versionFileInputRef}
+              type="file"
+              hidden
+              onChange={handleVersionUpload}
+              data-testid="input-version-upload"
+            />
             <Button
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
@@ -693,7 +894,7 @@ export default function ProjectDetail() {
           </div>
         </div>
 
-        {files.length === 0 ? (
+        {visibleFiles.length === 0 ? (
           <Card className="border-dashed">
             <CardContent className="py-16 text-center">
               <Upload className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
@@ -705,7 +906,16 @@ export default function ProjectDetail() {
           </Card>
         ) : (
           <div className="space-y-3">
-            {files.map((f) => (
+            {visibleFiles.map((f) => {
+              const groupId = f.version_group_id ?? f.id;
+              const versions =
+                fileGroups.find(
+                  (group) =>
+                    (group[0].version_group_id ?? group[0].id) === groupId,
+                ) ?? [f];
+              const reviewStatus =
+                f.review_status ?? (f.approved ? "approved" : "pending");
+              return (
               <Card key={f.id} data-testid={`card-file-${f.id}`}>
                 <CardContent className="py-4">
                   <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -724,6 +934,7 @@ export default function ProjectDetail() {
                           {f.file_name}
                         </a>
                         <div className="text-xs text-muted-foreground mt-0.5">
+                          Version {f.version_number ?? 1} ·{" "}
                           {formatBytes(f.file_size)} · uploaded{" "}
                           {format(new Date(f.created_at), "MMM d, yyyy")}
                         </div>
@@ -761,10 +972,15 @@ export default function ProjectDetail() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      {f.approved ? (
+                      {reviewStatus === "approved" ? (
                         <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 hover:bg-emerald-100">
                           <CheckCircle2 className="h-3 w-3 mr-1" />
                           Approved
+                        </Badge>
+                      ) : reviewStatus === "changes_requested" ? (
+                        <Badge className="bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-100">
+                          <RefreshCw className="h-3 w-3 mr-1" />
+                          Needs changes
                         </Badge>
                       ) : (
                         <Badge
@@ -776,6 +992,19 @@ export default function ProjectDetail() {
                         </Badge>
                       )}
                       <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setVersioningFileId(f.id);
+                          versionFileInputRef.current?.click();
+                        }}
+                        disabled={uploading}
+                        data-testid={`button-new-version-${f.id}`}
+                      >
+                        <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                        New version
+                      </Button>
+                      <Button
                         size="icon"
                         variant="ghost"
                         onClick={() => handleDelete(f)}
@@ -785,9 +1014,48 @@ export default function ProjectDetail() {
                       </Button>
                     </div>
                   </div>
+                  {versions.length > 1 && (
+                    <details className="mt-3 border-t border-border/60 pt-3">
+                      <summary className="cursor-pointer text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                        <History className="h-3.5 w-3.5" />
+                        {versions.length} versions
+                      </summary>
+                      <div className="mt-2 space-y-1.5 pl-5">
+                        {versions.map((version) => (
+                          <a
+                            key={version.id}
+                            href={version.file_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center justify-between gap-3 text-xs hover:underline"
+                          >
+                            <span>
+                              Version {version.version_number ?? 1} ·{" "}
+                              {version.file_name}
+                            </span>
+                            <span className="text-muted-foreground flex items-center gap-2">
+                              {version.review_status === "approved" && (
+                                <span className="text-emerald-700">
+                                  Approved
+                                </span>
+                              )}
+                              {version.id === f.id && (
+                                <span className="text-primary">Current</span>
+                              )}
+                              {format(
+                                new Date(version.created_at),
+                                "MMM d, yyyy",
+                              )}
+                            </span>
+                          </a>
+                        ))}
+                      </div>
+                    </details>
+                  )}
                 </CardContent>
               </Card>
-            ))}
+              );
+            })}
           </div>
         )}
 
@@ -849,7 +1117,18 @@ export default function ProjectDetail() {
                               asChild
                               data-testid={`button-remind-invoice-${inv.id}`}
                             >
-                              <a href={invoiceReminderLink(inv)}>
+                              <a
+                                href={invoiceReminderLink(inv)}
+                                onClick={() => {
+                                  if (project) {
+                                    void logActivity(
+                                      project.id,
+                                      "client_reminder_sent",
+                                      `Payment reminder sent for ${inv.invoice_number}`,
+                                    );
+                                  }
+                                }}
+                              >
                                 <Mail className="h-4 w-4 mr-1.5" />
                                 Remind
                               </a>

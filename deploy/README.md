@@ -14,6 +14,10 @@ No monorepo, no pnpm workspaces — just plain npm.
    - `VITE_SUPABASE_URL`
    - `VITE_SUPABASE_ANON_KEY`
 
+After the base Parlo tables and activity log are set up, run
+`SUPABASE_REVIEW_WORKFLOW.sql` in Supabase to enable file versions, the
+`Needs changes` review state, and reminder activity logging.
+
 ## Local dev
 
 ```bash

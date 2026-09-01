@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRoute } from "wouter";
 import { format } from "date-fns";
 import {
@@ -9,6 +9,7 @@ import {
   Download,
   Receipt,
   ExternalLink,
+  RefreshCw,
 } from "lucide-react";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
@@ -65,6 +66,30 @@ export default function ClientPortal() {
   const [payingId, setPayingId] = useState<string | null>(null);
   const { toast } = useToast();
 
+  const fileGroups = useMemo(() => {
+    const groups = new Map<string, ProjectFile[]>();
+    for (const file of files) {
+      const groupId = file.version_group_id ?? file.id;
+      const group = groups.get(groupId) ?? [];
+      group.push(file);
+      groups.set(groupId, group);
+    }
+    return Array.from(groups.values())
+      .map((group) =>
+        group.sort(
+          (a, b) =>
+            (b.version_number ?? 1) - (a.version_number ?? 1) ||
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+        ),
+      )
+      .sort(
+        (a, b) =>
+          new Date(b[0].created_at).getTime() -
+          new Date(a[0].created_at).getTime(),
+      );
+  }, [files]);
+  const visibleFiles = fileGroups.map((group) => group[0]);
+
   async function load() {
     if (!token) return;
     setLoading(true);
@@ -84,7 +109,9 @@ export default function ClientPortal() {
     const [{ data: f }, { data: inv }, { data: brand }] = await Promise.all([
       supabase
         .from("files")
-        .select("*")
+        .select(
+          "id, project_id, file_name, file_url, file_size, approved, approved_at, feedback, review_status, version_group_id, version_number, created_at",
+        )
         .eq("project_id", proj.id)
         .order("created_at", { ascending: false }),
       supabase
@@ -151,6 +178,7 @@ export default function ClientPortal() {
       .update({
         approved: true,
         approved_at: new Date().toISOString(),
+        review_status: "approved",
       })
       .eq("id", file.id);
     setSavingId(null);
@@ -177,7 +205,7 @@ export default function ClientPortal() {
     setSavingId(file.id);
     const { error } = await supabase
       .from("files")
-      .update({ feedback: text })
+      .update({ feedback: text, review_status: "changes_requested" })
       .eq("id", file.id);
     setSavingId(null);
     if (error) {
@@ -193,8 +221,37 @@ export default function ClientPortal() {
       "feedback_submitted",
       `Client left feedback on: ${file.file_name}`,
     );
+    await logActivity(
+      file.project_id,
+      "changes_requested",
+      `Client requested changes on: ${file.file_name}`,
+    );
     toast({ title: "Feedback sent" });
     setFeedbackDrafts((d) => ({ ...d, [file.id]: "" }));
+    load();
+  }
+
+  async function requestChanges(file: ProjectFile) {
+    setSavingId(file.id);
+    const { error } = await supabase
+      .from("files")
+      .update({ review_status: "changes_requested" })
+      .eq("id", file.id);
+    setSavingId(null);
+    if (error) {
+      toast({
+        title: "Couldn't request changes",
+        description: error.message,
+        variant: "destructive",
+      });
+      return;
+    }
+    await logActivity(
+      file.project_id,
+      "changes_requested",
+      `Client requested changes on: ${file.file_name}`,
+    );
+    toast({ title: "Changes requested" });
     load();
   }
 
@@ -237,7 +294,9 @@ export default function ClientPortal() {
     );
   }
 
-  const pendingCount = files.filter((f) => !f.approved).length;
+  const pendingCount = visibleFiles.filter(
+    (f) => (f.review_status ?? (f.approved ? "approved" : "pending")) !== "approved",
+  ).length;
 
   return (
     <div className="min-h-screen bg-background">
@@ -262,7 +321,7 @@ export default function ClientPortal() {
             Welcome, {project.client_name}. Review the files below, leave
             feedback, and approve when you're ready.
           </p>
-          {files.length > 0 && (
+          {visibleFiles.length > 0 && (
             <div className="mt-3 text-sm text-muted-foreground">
               {pendingCount > 0
                 ? `${pendingCount} file${pendingCount === 1 ? "" : "s"} awaiting your review`
@@ -271,7 +330,7 @@ export default function ClientPortal() {
           )}
         </div>
 
-        {files.length === 0 ? (
+        {visibleFiles.length === 0 ? (
           <Card className="border-dashed">
             <CardContent className="py-16 text-center">
               <FileIcon className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
@@ -283,8 +342,10 @@ export default function ClientPortal() {
           </Card>
         ) : (
           <div className="space-y-4">
-            {files.map((f) => {
+            {visibleFiles.map((f) => {
               const draft = feedbackDrafts[f.id] ?? "";
+              const reviewStatus =
+                f.review_status ?? (f.approved ? "approved" : "pending");
               return (
                 <Card key={f.id} data-testid={`card-client-file-${f.id}`}>
                   <CardContent className="py-5 space-y-4">
@@ -298,6 +359,7 @@ export default function ClientPortal() {
                             {f.file_name}
                           </div>
                           <div className="text-xs text-muted-foreground mt-0.5">
+                            Version {f.version_number ?? 1} ·{" "}
                             {formatBytes(f.file_size)} · shared{" "}
                             {format(new Date(f.created_at), "MMM d, yyyy")}
                           </div>
@@ -314,10 +376,15 @@ export default function ClientPortal() {
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        {f.approved ? (
+                        {reviewStatus === "approved" ? (
                           <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 hover:bg-emerald-100">
                             <CheckCircle2 className="h-3 w-3 mr-1" />
                             Approved
+                          </Badge>
+                        ) : reviewStatus === "changes_requested" ? (
+                          <Badge className="bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-100">
+                            <RefreshCw className="h-3 w-3 mr-1" />
+                            Needs changes
                           </Badge>
                         ) : (
                           <Badge
@@ -352,7 +419,7 @@ export default function ClientPortal() {
                       </div>
                     )}
 
-                    {!f.approved && (
+                    {reviewStatus !== "approved" && (
                       <div className="space-y-3 pt-1 border-t border-border/60">
                         <div className="space-y-2">
                           <Textarea
@@ -381,6 +448,16 @@ export default function ClientPortal() {
                             >
                               <MessageSquare className="h-4 w-4 mr-2" />
                               Send feedback
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => requestChanges(f)}
+                              disabled={savingId === f.id}
+                              data-testid={`button-request-changes-${f.id}`}
+                            >
+                              <RefreshCw className="h-4 w-4 mr-2" />
+                              Request changes
                             </Button>
                             <Button
                               size="sm"

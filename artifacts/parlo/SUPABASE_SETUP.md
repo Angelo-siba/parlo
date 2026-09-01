@@ -75,3 +75,9 @@ create policy "anon delete parlo-files"
 ```
 
 That's it — refresh Parlo and create your first project.
+
+## Review workflow upgrade
+
+For file version history, the `Needs changes` status, and reminder activity, run
+`SUPABASE_REVIEW_WORKFLOW.sql` after the base tables and activity log exist. The
+same migration is included in the standalone `deploy/` app.

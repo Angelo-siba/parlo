@@ -9,9 +9,12 @@ CREATE TABLE IF NOT EXISTS activity_log (
   event_type  TEXT        NOT NULL
                           CHECK (event_type IN (
                             'file_uploaded',
+                            'file_version_uploaded',
                             'file_deleted',
                             'file_approved',
-                            'feedback_submitted'
+                            'feedback_submitted',
+                            'changes_requested',
+                            'client_reminder_sent'
                           )),
   description TEXT        NOT NULL,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()

@@ -52,14 +52,22 @@ export type ProjectFile = {
   approved: boolean;
   approved_at: string | null;
   feedback: string | null;
+  review_status: FileReviewStatus;
+  version_group_id: string | null;
+  version_number: number;
   created_at: string;
 };
 
+export type FileReviewStatus = "pending" | "changes_requested" | "approved";
+
 export type ActivityEventType =
   | "file_uploaded"
+  | "file_version_uploaded"
   | "file_deleted"
   | "file_approved"
-  | "feedback_submitted";
+  | "feedback_submitted"
+  | "changes_requested"
+  | "client_reminder_sent";
 
 export type ActivityLog = {
   id: string;
