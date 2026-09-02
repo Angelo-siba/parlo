@@ -49,6 +49,7 @@ import {
   InvoiceLineItem,
   logActivity,
   loadProjectFiles,
+  isReviewWorkflowSchemaError,
 } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 
@@ -106,6 +107,7 @@ export default function ProjectDetail() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [versioningFileId, setVersioningFileId] = useState<string | null>(null);
+  const [legacyFileSchema, setLegacyFileSchema] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [copied, setCopied] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -162,6 +164,7 @@ export default function ProjectDetail() {
     } else {
       setFiles(fileResult.data);
     }
+    setLegacyFileSchema(fileResult.usedLegacySchema);
     setActivity((a ?? []) as ActivityLog[]);
     setInvoices((inv ?? []) as Invoice[]);
     setLoading(false);
@@ -295,7 +298,7 @@ export default function ProjectDetail() {
       const { data: pub } = supabase.storage
         .from(STORAGE_BUCKET)
         .getPublicUrl(path);
-      const { error: insErr } = await supabase.from("files").insert({
+      let { error: insErr } = await supabase.from("files").insert({
         project_id: project.id,
         file_name: file.name,
         file_url: pub.publicUrl,
@@ -304,6 +307,16 @@ export default function ProjectDetail() {
         review_status: "pending",
         version_number: 1,
       });
+      if (insErr && isReviewWorkflowSchemaError(insErr)) {
+        const legacyInsert = await supabase.from("files").insert({
+          project_id: project.id,
+          file_name: file.name,
+          file_url: pub.publicUrl,
+          file_size: file.size,
+          approved: false,
+        });
+        insErr = legacyInsert.error;
+      }
       if (insErr) {
         toast({
           title: `Couldn't save ${file.name}`,
@@ -343,6 +356,17 @@ export default function ProjectDetail() {
     const file = e.target.files?.[0];
     const source = files.find((candidate) => candidate.id === versioningFileId);
     if (!file || !source || !project) return;
+    if (legacyFileSchema) {
+      toast({
+        title: "Finish review workflow setup first",
+        description:
+          "Run SUPABASE_REVIEW_WORKFLOW.sql in Supabase to enable file versions.",
+        variant: "destructive",
+      });
+      setVersioningFileId(null);
+      e.target.value = "";
+      return;
+    }
 
     if (file.size > MAX_FILE_SIZE_BYTES) {
       toast({
@@ -403,8 +427,12 @@ export default function ProjectDetail() {
 
     if (insertError) {
       toast({
-        title: `Couldn't save version ${nextVersion}`,
-        description: insertError.message,
+        title: isReviewWorkflowSchemaError(insertError)
+          ? "Finish review workflow setup first"
+          : `Couldn't save version ${nextVersion}`,
+        description: isReviewWorkflowSchemaError(insertError)
+          ? "Run SUPABASE_REVIEW_WORKFLOW.sql in Supabase, then try again."
+          : insertError.message,
         variant: "destructive",
       });
     } else {
@@ -852,6 +880,27 @@ export default function ProjectDetail() {
           </CardContent>
         </Card>
 
+        {legacyFileSchema && (
+          <Card className="mb-4 border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/20">
+            <CardContent className="py-3.5">
+              <div className="flex items-start gap-3">
+                <Clock className="h-4 w-4 text-amber-700 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                <div className="text-sm">
+                  <p className="font-medium text-amber-900 dark:text-amber-200">
+                    Review workflow setup needed
+                  </p>
+                  <p className="text-amber-800/80 dark:text-amber-300/80 mt-0.5">
+                    Files are loading in compatibility mode. Run{" "}
+                    <span className="font-mono text-xs">
+                      SUPABASE_REVIEW_WORKFLOW.sql
+                    </span>{" "}
+                    in Supabase to enable version history and Needs changes.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <h2 className="text-xl font-semibold">Files</h2>
@@ -966,7 +1015,7 @@ export default function ProjectDetail() {
                         )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-shrink-0">
                       {reviewStatus === "approved" ? (
                         <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 hover:bg-emerald-100">
                           <CheckCircle2 className="h-3 w-3 mr-1" />
@@ -986,6 +1035,15 @@ export default function ProjectDetail() {
                           Pending
                         </Badge>
                       )}
+                    </div>
+                  </div>
+                  <div className="mt-4 pt-3 border-t border-border/60 flex items-center justify-between gap-3">
+                    <span className="text-xs text-muted-foreground">
+                      {versions.length > 1
+                        ? `${versions.length} versions`
+                        : "Current version"}
+                    </span>
+                    <div className="flex items-center gap-1.5">
                       <Button
                         size="sm"
                         variant="outline"
@@ -993,7 +1051,12 @@ export default function ProjectDetail() {
                           setVersioningFileId(f.id);
                           versionFileInputRef.current?.click();
                         }}
-                        disabled={uploading}
+                        disabled={uploading || legacyFileSchema}
+                        title={
+                          legacyFileSchema
+                            ? "Run the review workflow migration to enable versioning"
+                            : "Upload a new version"
+                        }
                         data-testid={`button-new-version-${f.id}`}
                       >
                         <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
@@ -1002,6 +1065,7 @@ export default function ProjectDetail() {
                       <Button
                         size="icon"
                         variant="ghost"
+                        aria-label={`Delete ${f.file_name}`}
                         onClick={() => handleDelete(f)}
                         data-testid={`button-delete-${f.id}`}
                       >
@@ -1010,7 +1074,7 @@ export default function ProjectDetail() {
                     </div>
                   </div>
                   {versions.length > 1 && (
-                    <details className="mt-3 border-t border-border/60 pt-3">
+                    <details className="mt-3">
                       <summary className="cursor-pointer text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                         <History className="h-3.5 w-3.5" />
                         {versions.length} versions

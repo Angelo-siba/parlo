@@ -25,6 +25,7 @@ import {
   FreelancerSettings,
   logActivity,
   loadProjectFiles,
+  isReviewWorkflowSchemaError,
 } from "@/lib/supabase";
 
 function formatBytes(bytes: number) {
@@ -168,7 +169,7 @@ export default function ClientPortal() {
 
   async function approve(file: ProjectFile) {
     setSavingId(file.id);
-    const { error } = await supabase
+    let { error } = await supabase
       .from("files")
       .update({
         approved: true,
@@ -176,6 +177,16 @@ export default function ClientPortal() {
         review_status: "approved",
       })
       .eq("id", file.id);
+    if (error && isReviewWorkflowSchemaError(error)) {
+      const legacyUpdate = await supabase
+        .from("files")
+        .update({
+          approved: true,
+          approved_at: new Date().toISOString(),
+        })
+        .eq("id", file.id);
+      error = legacyUpdate.error;
+    }
     setSavingId(null);
     if (error) {
       toast({
@@ -198,10 +209,17 @@ export default function ClientPortal() {
     const text = feedbackDrafts[file.id]?.trim();
     if (!text) return;
     setSavingId(file.id);
-    const { error } = await supabase
+    let { error } = await supabase
       .from("files")
       .update({ feedback: text, review_status: "changes_requested" })
       .eq("id", file.id);
+    if (error && isReviewWorkflowSchemaError(error)) {
+      const legacyUpdate = await supabase
+        .from("files")
+        .update({ feedback: text })
+        .eq("id", file.id);
+      error = legacyUpdate.error;
+    }
     setSavingId(null);
     if (error) {
       toast({
@@ -235,8 +253,12 @@ export default function ClientPortal() {
     setSavingId(null);
     if (error) {
       toast({
-        title: "Couldn't request changes",
-        description: error.message,
+        title: isReviewWorkflowSchemaError(error)
+          ? "Add feedback to request changes"
+          : "Couldn't request changes",
+        description: isReviewWorkflowSchemaError(error)
+          ? "The review setup is not finished yet. Add a note for your freelancer instead."
+          : error.message,
         variant: "destructive",
       });
       return;

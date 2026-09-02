@@ -60,6 +60,18 @@ export type ProjectFile = {
 
 export type FileReviewStatus = "pending" | "changes_requested" | "approved";
 
+export function isReviewWorkflowSchemaError(
+  error: { code?: string | null; message?: string | null } | null | undefined,
+) {
+  const message = error?.message?.toLowerCase() ?? "";
+  return (
+    error?.code === "PGRST204" ||
+    message.includes("review_status") ||
+    message.includes("version_group_id") ||
+    message.includes("version_number")
+  );
+}
+
 const MODERN_FILE_COLUMNS =
   "id, project_id, file_name, file_url, file_size, approved, approved_at, feedback, review_status, version_group_id, version_number, created_at";
 const LEGACY_FILE_COLUMNS =
