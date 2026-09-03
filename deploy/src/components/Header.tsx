@@ -1,7 +1,7 @@
 import { Link } from "wouter";
 import { LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { LEMON_SQUEEZY_CHECKOUT_URL } from "@/lib/billing";
+import { getCheckoutUrl } from "@/lib/billing";
 
 export function Header({
   subtitle,
@@ -11,6 +11,7 @@ export function Header({
   brandName,
   brandColor,
   showUpgrade,
+  userId,
 }: {
   subtitle?: string;
   onLogout?: () => void;
@@ -19,6 +20,7 @@ export function Header({
   brandName?: string | null;
   brandColor?: string | null;
   showUpgrade?: boolean;
+  userId?: string | null;
 }) {
   const accentStyle = brandColor ? { borderBottomColor: brandColor } : {};
 
@@ -65,7 +67,7 @@ export function Header({
           <nav className="flex items-center gap-2 sm:gap-3">
             {showUpgrade && (
               <Button asChild size="sm" data-testid="button-header-upgrade">
-                <a href={LEMON_SQUEEZY_CHECKOUT_URL} target="_blank" rel="noreferrer">Upgrade to Pro</a>
+                <a href={getCheckoutUrl(userId)} target="_blank" rel="noreferrer">Upgrade to Pro</a>
               </Button>
             )}
           </nav>
