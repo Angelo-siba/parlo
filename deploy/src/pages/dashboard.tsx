@@ -445,6 +445,7 @@ export default function Dashboard() {
         onLogout={signOut}
         userEmail={user?.email}
         userId={user?.id}
+        isPro={isPro}
         showUpgrade={!isPro && !billingLoading}
       />
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
