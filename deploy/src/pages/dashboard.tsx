@@ -236,6 +236,22 @@ export default function Dashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
+  useEffect(() => {
+    const refreshSubscription = () => {
+      if (document.visibilityState === "visible") {
+        loadSubscription();
+      }
+    };
+
+    window.addEventListener("focus", refreshSubscription);
+    document.addEventListener("visibilitychange", refreshSubscription);
+    return () => {
+      window.removeEventListener("focus", refreshSubscription);
+      document.removeEventListener("visibilitychange", refreshSubscription);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim() || !clientName.trim() || !clientEmail.trim()) return;
