@@ -1,0 +1,2 @@
+[functions.lemon-squeezy-webhook]
+verify_jwt = false
