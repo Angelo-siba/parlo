@@ -24,6 +24,7 @@ const SUBSCRIPTION_EVENTS = new Set([
 ]);
 
 const EVENT_STATUS_FALLBACKS: Record<string, string> = {
+  subscription_cancelled: "cancelled",
   subscription_resumed: "active",
   subscription_expired: "expired",
   subscription_paused: "paused",
