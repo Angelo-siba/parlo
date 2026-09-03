@@ -653,9 +653,9 @@ export default function ProjectDetail() {
   return (
     <div className="min-h-screen bg-background">
       <Header subtitle="Project" onLogout={signOut} userEmail={user?.email} />
-      <main className="max-w-5xl mx-auto px-6 py-8">
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <Link href="/" data-testid="link-back">
-          <Button variant="ghost" size="sm" className="mb-4 -ml-3">
+          <Button variant="ghost" size="sm" className="mb-3 -ml-3">
             <ArrowLeft className="h-4 w-4 mr-2" />
             All projects
           </Button>
@@ -664,7 +664,7 @@ export default function ProjectDetail() {
         <div className="flex items-start justify-between flex-wrap gap-4 mb-2">
           <div>
             <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="text-3xl font-semibold tracking-tight">
+              <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">
                 {project.name}
               </h1>
               <select
@@ -836,7 +836,7 @@ export default function ProjectDetail() {
           </div>
         </div>
 
-        <Card className="my-6 bg-primary/5 border-primary/30">
+        <Card className="my-5 bg-primary/5 border-primary/30">
           <CardContent className="py-4">
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div className="min-w-0 flex-1">
@@ -901,9 +901,9 @@ export default function ProjectDetail() {
             </CardContent>
           </Card>
         )}
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
-            <h2 className="text-xl font-semibold">Files</h2>
+            <h2 className="text-lg sm:text-xl font-semibold">Files</h2>
             <span className="text-sm text-muted-foreground">
               {approvedCount} approved · {pendingCount} pending
             </span>
@@ -940,7 +940,7 @@ export default function ProjectDetail() {
 
         {visibleFiles.length === 0 ? (
           <Card className="border-dashed">
-            <CardContent className="py-16 text-center">
+            <CardContent className="py-12 text-center">
               <Upload className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
               <h3 className="text-lg font-medium">No files yet</h3>
               <p className="text-muted-foreground">
@@ -949,7 +949,7 @@ export default function ProjectDetail() {
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-2">
             {visibleFiles.map((f) => {
               const groupId = f.version_group_id ?? f.id;
               const versions =
