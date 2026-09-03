@@ -43,7 +43,13 @@ import {
   loadAllProjectFiles,
 } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
-import { FREE_PROJECT_LIMIT, LEMON_SQUEEZY_CHECKOUT_URL, isProUser } from "@/lib/billing";
+import {
+  BillingSubscription,
+  FREE_PROJECT_LIMIT,
+  LEMON_SQUEEZY_CHECKOUT_URL,
+  isActiveSubscription,
+  isProUser,
+} from "@/lib/billing";
 
 type ProjectWithStats = Project & {
   fileCount: number;
@@ -61,7 +67,8 @@ const DEFAULT_ACCENT = "#d4521a";
 
 export default function Dashboard() {
   const { user, signOut } = useAuth();
-  const isPro = isProUser(user);
+  const [isPro, setIsPro] = useState(() => isProUser(user));
+  const [billingLoading, setBillingLoading] = useState(Boolean(user));
   const [projects, setProjects] = useState<ProjectWithStats[]>([]);
   const activeProjectCount = projects.filter((project) => project.status === "active").length;
   const [loading, setLoading] = useState(true);
@@ -184,6 +191,29 @@ export default function Dashboard() {
     }
   }
 
+  async function loadSubscription() {
+    if (!user) {
+      setIsPro(false);
+      setBillingLoading(false);
+      return;
+    }
+
+    setBillingLoading(true);
+    const { data, error } = await supabase
+      .from("subscriptions")
+      .select("status, ends_at")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (!error && data) {
+      setIsPro(isActiveSubscription(data as BillingSubscription));
+    } else {
+      // Keep legacy metadata support while a workspace is applying the migration.
+      setIsPro(isProUser(user));
+    }
+    setBillingLoading(false);
+  }
+
   async function loadSettings() {
     if (!user) return;
     const { data } = await supabase
@@ -201,6 +231,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadProjects();
+    loadSubscription();
     loadSettings();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
@@ -251,6 +282,11 @@ export default function Dashboard() {
     });
     setSubmitting(false);
     if (error) {
+      if (error.message.includes("FREE_PROJECT_LIMIT_REACHED")) {
+        setOpen(false);
+        setLimitDialogOpen(true);
+        return;
+      }
       toast({
         title: "Couldn't create project",
         description: error.message,
@@ -392,7 +428,8 @@ export default function Dashboard() {
         subtitle="Freelancer dashboard"
         onLogout={signOut}
         userEmail={user?.email}
-        showUpgrade={!isPro}
+        userId={user?.id}
+        showUpgrade={!isPro && !billingLoading}
       />
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <div className="flex items-start justify-between mb-6 flex-wrap gap-3">
