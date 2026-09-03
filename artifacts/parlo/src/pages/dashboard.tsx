@@ -357,15 +357,15 @@ export default function Dashboard() {
         onLogout={signOut}
         userEmail={user?.email}
       />
-      <main className="max-w-6xl mx-auto px-6 py-10">
-        <div className="flex items-end justify-between mb-8 flex-wrap gap-4">
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        <div className="flex items-start justify-between mb-6 flex-wrap gap-3">
           <div>
-            <h1 className="text-3xl font-semibold tracking-tight">Projects</h1>
+            <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">Projects</h1>
             <p className="text-muted-foreground mt-1">
               Manage client work and review approvals.
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             <Button
               variant="outline"
               size="sm"
@@ -540,10 +540,10 @@ export default function Dashboard() {
         {/* Revenue stats */}
         {hasRevenue && (
           <div className="mb-6">
-            <h2 className="text-sm font-medium text-muted-foreground mb-3 uppercase tracking-wide">
+            <h2 className="text-sm font-semibold text-foreground mb-3">
               Revenue
             </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <RevenueCard
                 icon={<DollarSign className="h-5 w-5" />}
                 label="Total revenue"
@@ -565,7 +565,7 @@ export default function Dashboard() {
         )}
 
         {/* Project stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
           <StatCard
             icon={<FolderOpen className="h-5 w-5" />}
             label="Active projects"
@@ -596,7 +596,7 @@ export default function Dashboard() {
           </div>
         ) : projects.length === 0 ? (
           <Card className="border-dashed">
-            <CardContent className="py-16 text-center">
+            <CardContent className="py-12 text-center">
               <FolderOpen className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
               <h3 className="text-lg font-medium">No projects yet</h3>
               <p className="text-muted-foreground mb-4">
@@ -612,7 +612,7 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {projects.map((p) => (
               <Link
                 key={p.id}
@@ -692,9 +692,9 @@ function StatCard({
 }) {
   return (
     <Card>
-      <CardContent className="py-5 flex items-center gap-4">
+      <CardContent className="py-4 flex items-center gap-3">
         <div
-          className={`h-10 w-10 rounded-lg flex items-center justify-center ${
+          className={`h-9 w-9 rounded-lg flex items-center justify-center ${
             highlight
               ? "bg-primary/15 text-primary"
               : "bg-muted text-muted-foreground"
@@ -703,7 +703,7 @@ function StatCard({
           {icon}
         </div>
         <div>
-          <div className="text-2xl font-semibold leading-none">{value}</div>
+          <div className="text-xl font-semibold leading-none">{value}</div>
           <div className="text-xs text-muted-foreground mt-1">{label}</div>
         </div>
       </CardContent>
@@ -756,7 +756,7 @@ function ReminderBar({ projects }: { projects: ProjectWithStats[] }) {
   }
 
   return (
-    <Card className="mb-8 border-primary/30 bg-primary/5">
+    <Card className="mb-6 border-primary/30 bg-primary/5">
       <CardContent className="py-4">
         <div className="flex items-start gap-3">
           <AlertCircle className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
