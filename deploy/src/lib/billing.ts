@@ -19,3 +19,32 @@ export function isProUser(user: UserWithMetadata): boolean {
     metadata?.is_pro === true
   );
 }
+
+
+export type BillingSubscription = {
+  status: string;
+  ends_at: string | null;
+};
+
+export function isActiveSubscription(
+  subscription: BillingSubscription | null | undefined,
+): boolean {
+  if (!subscription) return false;
+
+  if (["active", "on_trial", "past_due"].includes(subscription.status)) {
+    return true;
+  }
+
+  return (
+    subscription.status === "cancelled" &&
+    (!subscription.ends_at || new Date(subscription.ends_at).getTime() > Date.now())
+  );
+}
+
+export function getCheckoutUrl(userId?: string | null): string {
+  if (!userId) return LEMON_SQUEEZY_CHECKOUT_URL;
+
+  const checkoutUrl = new URL(LEMON_SQUEEZY_CHECKOUT_URL);
+  checkoutUrl.searchParams.set("checkout[custom][user_id]", userId);
+  return checkoutUrl.toString();
+}
