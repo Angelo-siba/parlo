@@ -12,7 +12,8 @@ From the repository root, with the Supabase CLI linked to the Parlo project:
 
 ~~~sh
 supabase functions deploy lemon-squeezy-webhook --no-verify-jwt
-supabase secrets set LEMON_SQUEEZY_WEBHOOK_SECRET="<the signing secret from Lemon Squeezy>"
+supabase secrets set LEMON_SQUEEZY_TEST_WEBHOOK_SECRET="<the test webhook signing secret>"
+supabase secrets set LEMON_SQUEEZY_WEBHOOK_SECRET="<the live webhook signing secret>"
 ~~~
 
 The endpoint is:
