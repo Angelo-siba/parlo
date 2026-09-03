@@ -12,6 +12,7 @@ export function Header({
   brandColor,
   showUpgrade,
   userId,
+  isPro,
 }: {
   subtitle?: string;
   onLogout?: () => void;
@@ -21,6 +22,7 @@ export function Header({
   brandColor?: string | null;
   showUpgrade?: boolean;
   userId?: string | null;
+  isPro?: boolean;
 }) {
   const accentStyle = brandColor ? { borderBottomColor: brandColor } : {};
 
@@ -73,6 +75,14 @@ export function Header({
           </nav>
           {onLogout && (
             <div className="flex items-center gap-3">
+              {isPro && (
+                <span
+                  className="inline-flex items-center rounded-full border border-primary/25 bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary"
+                  data-testid="badge-pro"
+                >
+                  Pro
+                </span>
+              )}
               {userEmail && (
                 <span className="text-sm text-muted-foreground hidden sm:block truncate max-w-[200px]">
                   {userEmail}
