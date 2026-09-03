@@ -27,7 +27,7 @@ export function Header({
       className="border-b border-border/60 bg-background/80 backdrop-blur sticky top-0 z-10"
       style={accentStyle}
     >
-      <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
         <Link
           href="/"
           className="flex items-center gap-2 group"
@@ -61,8 +61,8 @@ export function Header({
           </div>
         </Link>
 
-        <div className="flex items-center gap-2 sm:gap-4">
-          <nav className="flex items-center gap-2 sm:gap-4">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <nav className="flex items-center gap-2 sm:gap-3">
             {showUpgrade && (
               <Button asChild size="sm" data-testid="button-header-upgrade">
                 <a href={LEMON_SQUEEZY_CHECKOUT_URL} target="_blank" rel="noreferrer">Upgrade to Pro</a>
