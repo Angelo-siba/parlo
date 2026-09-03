@@ -73,15 +73,23 @@ Deno.serve(async (request) => {
     return jsonResponse({ error: "Method not allowed" }, 405);
   }
 
-  const secret = Deno.env.get("LEMON_SQUEEZY_WEBHOOK_SECRET");
-  const signature = request.headers.get("X-Signature");
-  if (!secret || !signature) {
+  const signature = request.headers.get("X-Signature")?.trim();
+  const signingSecrets = [
+    Deno.env.get("LEMON_SQUEEZY_TEST_WEBHOOK_SECRET"),
+    Deno.env.get("LEMON_SQUEEZY_WEBHOOK_SECRET"),
+  ]
+    .map((secret) => secret?.trim())
+    .filter((secret): secret is string => Boolean(secret));
+
+  if (!signingSecrets.length || !signature) {
     return jsonResponse({ error: "Webhook signature is not configured" }, 401);
   }
 
   const rawBody = await request.text();
-  const expectedSignature = await signatureFor(rawBody, secret);
-  if (!signaturesMatch(expectedSignature, signature)) {
+  const expectedSignatures = await Promise.all(
+    signingSecrets.map((secret) => signatureFor(rawBody, secret)),
+  );
+  if (!expectedSignatures.some((expected) => signaturesMatch(expected, signature))) {
     return jsonResponse({ error: "Invalid webhook signature" }, 401);
   }
 
