@@ -14,7 +14,6 @@ import {
   Hourglass,
   Upload,
   ArrowUpRight,
-  Pencil,
 } from "lucide-react";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
@@ -79,9 +78,6 @@ export default function Dashboard() {
   const [clientName, setClientName] = useState("");
   const [clientEmail, setClientEmail] = useState("");
   const [limitDialogOpen, setLimitDialogOpen] = useState(false);
-  const [renamingProject, setRenamingProject] = useState<ProjectWithStats | null>(null);
-  const [renameValue, setRenameValue] = useState("");
-  const [renaming, setRenaming] = useState(false);
   const { toast } = useToast();
 
   // Revenue
@@ -320,45 +316,6 @@ export default function Dashboard() {
     setClientEmail("");
     setOpen(false);
     loadProjects();
-  }
-
-  function openRename(project: ProjectWithStats) {
-    setRenamingProject(project);
-    setRenameValue(project.name);
-  }
-
-  async function handleRename(e: React.FormEvent) {
-    e.preventDefault();
-    if (!renamingProject || !renameValue.trim() || !user) return;
-
-    const nextName = renameValue.trim();
-    setRenaming(true);
-    const { error } = await supabase
-      .from("projects")
-      .update({ name: nextName })
-      .eq("id", renamingProject.id)
-      .eq("user_id", user.id);
-    setRenaming(false);
-
-    if (error) {
-      toast({
-        title: "Couldn't rename project",
-        description: error.message,
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setProjects((current) =>
-      current.map((project) =>
-        project.id === renamingProject.id
-          ? { ...project, name: nextName }
-          : project,
-      ),
-    );
-    setRenamingProject(null);
-    setRenameValue("");
-    toast({ title: "Project renamed" });
   }
 
   function handleLogoChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -613,53 +570,6 @@ export default function Dashboard() {
           </DialogContent>
         </Dialog>
 
-        {/* Rename project dialog */}
-        <Dialog
-          open={Boolean(renamingProject)}
-          onOpenChange={(nextOpen) => {
-            if (!nextOpen && !renaming) {
-              setRenamingProject(null);
-              setRenameValue("");
-            }
-          }}
-        >
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Rename project</DialogTitle>
-              <DialogDescription>
-                Choose a name that makes this project easy to find.
-              </DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleRename} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="rename-project">Project name</Label>
-                <Input
-                  id="rename-project"
-                  value={renameValue}
-                  onChange={(e) => setRenameValue(e.target.value)}
-                  maxLength={120}
-                  autoFocus
-                  required
-                  data-testid="input-rename-project"
-                />
-              </div>
-              <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setRenamingProject(null)}
-                  disabled={renaming}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={renaming || !renameValue.trim()} data-testid="button-save-project-name">
-                  {renaming ? "Saving..." : "Save name"}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-
         {/* Brand settings dialog */}
         <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
           <DialogContent className="max-w-md">
@@ -835,59 +745,45 @@ export default function Dashboard() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {projects.map((p) => (
-              <div key={p.id} className="relative">
-                <Link
-                  href={"/projects/" + p.id}
-                  className="block h-full"
-                  data-testid={"link-project-" + p.id}
-                >
-                  <Card className="hover-elevate cursor-pointer h-full">
-                    <CardHeader>
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-center gap-2 flex-wrap min-w-0 pr-16">
-                          <CardTitle className="text-lg">{p.name}</CardTitle>
-                          <StatusBadge status={p.status} />
-                        </div>
-                        {p.pendingCount > 0 ? (
-                          <Badge
-                            variant="secondary"
-                            className="bg-primary/10 text-primary border-primary/20 shrink-0"
-                          >
-                            {p.pendingCount} pending
-                          </Badge>
-                        ) : p.fileCount > 0 ? (
-                          <Badge variant="outline" className="shrink-0">All approved</Badge>
-                        ) : (
-                          <Badge variant="outline" className="shrink-0">No files</Badge>
-                        )}
+              <Link
+                key={p.id}
+                href={"/projects/" + p.id}
+                data-testid={"link-project-" + p.id}
+              >
+                <Card className="hover-elevate cursor-pointer h-full">
+                  <CardHeader>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2 flex-wrap min-w-0">
+                        <CardTitle className="text-lg">{p.name}</CardTitle>
+                        <StatusBadge status={p.status} />
                       </div>
-                    </CardHeader>
-                    <CardContent className="space-y-2 pb-14 text-sm">
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Mail className="h-3.5 w-3.5" />
-                        {p.client_name} · {p.client_email}
-                      </div>
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Clock className="h-3.5 w-3.5" />
-                        Created{" "}
-                        {format(new Date(p.created_at), "MMM d, yyyy")}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </Link>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="absolute bottom-3 right-3 h-8 px-2 text-muted-foreground hover:text-foreground"
-                  onClick={() => openRename(p)}
-                  data-testid={"button-rename-project-" + p.id}
-                  aria-label={"Rename " + p.name}
-                >
-                  <Pencil className="h-3.5 w-3.5 mr-1.5" />
-                  Rename
-                </Button>
-              </div>
+                      {p.pendingCount > 0 ? (
+                        <Badge
+                          variant="secondary"
+                          className="bg-primary/10 text-primary border-primary/20 shrink-0"
+                        >
+                          {p.pendingCount} pending
+                        </Badge>
+                      ) : p.fileCount > 0 ? (
+                        <Badge variant="outline" className="shrink-0">All approved</Badge>
+                      ) : (
+                        <Badge variant="outline" className="shrink-0">No files</Badge>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-2 text-sm">
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Mail className="h-3.5 w-3.5" />
+                      {p.client_name} · {p.client_email}
+                    </div>
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Clock className="h-3.5 w-3.5" />
+                      Created{" "}
+                      {format(new Date(p.created_at), "MMM d, yyyy")}
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
             ))}
           </div>
         )}
