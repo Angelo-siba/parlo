@@ -20,6 +20,7 @@ import {
   Bell,
   History,
   RefreshCw,
+  Pencil,
 } from "lucide-react";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
@@ -109,6 +110,9 @@ export default function ProjectDetail() {
   const [versioningFileId, setVersioningFileId] = useState<string | null>(null);
   const [legacyFileSchema, setLegacyFileSchema] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renameValue, setRenameValue] = useState("");
+  const [renaming, setRenaming] = useState(false);
   const [copied, setCopied] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const versionFileInputRef = useRef<HTMLInputElement>(null);
@@ -501,6 +505,36 @@ export default function ProjectDetail() {
     }
   }
 
+  async function handleRename(e: React.FormEvent) {
+    e.preventDefault();
+    if (!project || !user || !renameValue.trim() || renaming) return;
+
+    const nextName = renameValue.trim();
+    setRenaming(true);
+    const { error } = await supabase
+      .from("projects")
+      .update({ name: nextName })
+      .eq("id", project.id)
+      .eq("user_id", user.id);
+    setRenaming(false);
+
+    if (error) {
+      toast({
+        title: "Couldn't rename project",
+        description: error.message,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setProject((current) =>
+      current ? { ...current, name: nextName } : current,
+    );
+    setRenameOpen(false);
+    setRenameValue("");
+    toast({ title: "Project renamed" });
+  }
+
   function shareUrl() {
     if (!project) return "";
     return `${window.location.origin}${import.meta.env.BASE_URL}client/${project.share_token}`;
@@ -664,9 +698,24 @@ export default function ProjectDetail() {
         <div className="flex items-start justify-between flex-wrap gap-4 mb-2">
           <div>
             <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">
+              <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight break-words">
                 {project.name}
               </h1>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
+                onClick={() => {
+                  setRenameValue(project.name);
+                  setRenameOpen(true);
+                }}
+                aria-label="Rename project"
+                title="Rename project"
+                data-testid="button-rename-project"
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
               <select
                 value={project.status}
                 disabled={updatingStatus}
@@ -835,6 +884,48 @@ export default function ProjectDetail() {
             </Button>
           </div>
         </div>
+
+        <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Rename project</DialogTitle>
+              <DialogDescription>
+                Choose a name that makes this project easy to find.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleRename} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="rename-project">Project name</Label>
+                <Input
+                  id="rename-project"
+                  value={renameValue}
+                  onChange={(e) => setRenameValue(e.target.value)}
+                  maxLength={120}
+                  autoFocus
+                  required
+                  data-testid="input-rename-project"
+                />
+              </div>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setRenameOpen(false)}
+                  disabled={renaming}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={renaming || !renameValue.trim()}
+                  data-testid="button-save-project-name"
+                >
+                  {renaming ? "Saving..." : "Save name"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
 
         <Card className="my-5 bg-primary/5 border-primary/30">
           <CardContent className="py-4">
