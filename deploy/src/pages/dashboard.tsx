@@ -449,93 +449,111 @@ export default function Dashboard() {
         showUpgrade={!isPro && !billingLoading}
       />
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        <div className="flex items-start justify-between mb-6 flex-wrap gap-3">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">Projects</h1>
-            <p className="text-muted-foreground mt-1">
-              Manage client work and review approvals.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setSettingsOpen(true)}
-              data-testid="button-settings"
-            >
-              <Settings className="h-4 w-4 mr-2" />
-              Brand settings
-            </Button>
-            <Dialog
-              open={open}
-              onOpenChange={(nextOpen) => {
-                if (nextOpen && !isPro && activeProjectCount >= FREE_PROJECT_LIMIT) {
-                  setLimitDialogOpen(true);
-                  return;
-                }
-                setOpen(nextOpen);
-              }}
-            >
-              <DialogTrigger asChild>
-                <Button data-testid="button-new-project">
-                  <Plus className="mr-2 h-4 w-4" />
-                  New project
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Create a new project</DialogTitle>
-                  <DialogDescription>
-                    You'll get a unique link to share with your client.
-                  </DialogDescription>
-                </DialogHeader>
-                <form onSubmit={handleCreate} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Project name</Label>
-                    <Input
-                      id="name"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder="Website redesign"
-                      required
-                      data-testid="input-project-name"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="clientName">Client name</Label>
-                    <Input
-                      id="clientName"
-                      value={clientName}
-                      onChange={(e) => setClientName(e.target.value)}
-                      placeholder="Jane Doe"
-                      required
-                      data-testid="input-client-name"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="clientEmail">Client email</Label>
-                    <Input
-                      id="clientEmail"
-                      type="email"
-                      value={clientEmail}
-                      onChange={(e) => setClientEmail(e.target.value)}
-                      placeholder="jane@acme.com"
-                      required
-                      data-testid="input-client-email"
-                    />
-                  </div>
-                  <DialogFooter>
-                    <Button
-                      type="submit"
-                      disabled={submitting}
-                      data-testid="button-create-project"
-                    >
-                      {submitting ? "Creating..." : "Create project"}
-                    </Button>
-                  </DialogFooter>
-                </form>
-              </DialogContent>
-            </Dialog>
+        <div className="mb-6 overflow-hidden rounded-2xl border border-primary/15 bg-primary/5 shadow-sm">
+          <div className="flex items-start justify-between gap-6 flex-wrap p-5 sm:p-6">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap mb-2">
+                <span className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+                  Workspace
+                </span>
+                {isPro ? (
+                  <Badge className="bg-primary/10 text-primary border-primary/20 hover:bg-primary/10">
+                    Pro workspace
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="bg-background/60">
+                    {activeProjectCount} of {FREE_PROJECT_LIMIT} active
+                  </Badge>
+                )}
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">
+                Your projects
+              </h1>
+              <p className="text-muted-foreground mt-1.5 max-w-xl">
+                Keep client work moving, share approvals, and see what needs your attention.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSettingsOpen(true)}
+                data-testid="button-settings"
+              >
+                <Settings className="h-4 w-4 mr-2" />
+                Brand settings
+              </Button>
+              <Dialog
+                open={open}
+                onOpenChange={(nextOpen) => {
+                  if (nextOpen && !isPro && activeProjectCount >= FREE_PROJECT_LIMIT) {
+                    setLimitDialogOpen(true);
+                    return;
+                  }
+                  setOpen(nextOpen);
+                }}
+              >
+                <DialogTrigger asChild>
+                  <Button data-testid="button-new-project">
+                    <Plus className="mr-2 h-4 w-4" />
+                    New project
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Create a new project</DialogTitle>
+                    <DialogDescription>
+                      You'll get a unique link to share with your client.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <form onSubmit={handleCreate} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="name">Project name</Label>
+                      <Input
+                        id="name"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        placeholder="Website redesign"
+                        required
+                        data-testid="input-project-name"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="clientName">Client name</Label>
+                      <Input
+                        id="clientName"
+                        value={clientName}
+                        onChange={(e) => setClientName(e.target.value)}
+                        placeholder="Jane Doe"
+                        required
+                        data-testid="input-client-name"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="clientEmail">Client email</Label>
+                      <Input
+                        id="clientEmail"
+                        type="email"
+                        value={clientEmail}
+                        onChange={(e) => setClientEmail(e.target.value)}
+                        placeholder="jane@acme.com"
+                        required
+                        data-testid="input-client-email"
+                      />
+                    </div>
+                    <DialogFooter>
+                      <Button
+                        type="submit"
+                        disabled={submitting}
+                        data-testid="button-create-project"
+                      >
+                        {submitting ? "Creating..." : "Create project"}
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            </div>
           </div>
         </div>
 
@@ -700,7 +718,7 @@ export default function Dashboard() {
             <StatCard
               icon={<FolderOpen className="h-5 w-5" />}
               label="Active projects"
-              value={projects.length}
+              value={activeProjectCount}
             />
             <StatCard
               icon={<Clock className="h-5 w-5" />}
@@ -801,7 +819,7 @@ export default function Dashboard() {
                 href={"/projects/" + p.id}
                 data-testid={"link-project-" + p.id}
               >
-                <Card className="hover-elevate cursor-pointer h-full">
+                <Card className="hover-elevate cursor-pointer h-full transition-colors hover:border-primary/30">
                   <CardHeader>
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-2 flex-wrap min-w-0">
@@ -831,6 +849,10 @@ export default function Dashboard() {
                       <Clock className="h-3.5 w-3.5" />
                       Created{" "}
                       {format(new Date(p.created_at), "MMM d, yyyy")}
+                    </div>
+                    <div className="mt-4 flex items-center justify-between border-t border-border/60 pt-3 text-sm">
+                      <span className="font-medium text-foreground">Open project</span>
+                      <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
                     </div>
                   </CardContent>
                 </Card>
