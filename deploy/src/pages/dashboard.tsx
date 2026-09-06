@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import {
@@ -14,6 +14,7 @@ import {
   Hourglass,
   Upload,
   ArrowUpRight,
+  Search,
 } from "lucide-react";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
@@ -71,6 +72,24 @@ export default function Dashboard() {
   const [billingLoading, setBillingLoading] = useState(Boolean(user));
   const [projects, setProjects] = useState<ProjectWithStats[]>([]);
   const activeProjectCount = projects.filter((project) => project.status === "active").length;
+  const visibleProjects = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return [...projects]
+      .filter((project) => {
+        const matchesStatus = statusFilter === "all" || project.status === statusFilter;
+        const matchesQuery =
+          !query ||
+          project.name.toLowerCase().includes(query) ||
+          project.client_name.toLowerCase().includes(query) ||
+          project.client_email.toLowerCase().includes(query);
+        return matchesStatus && matchesQuery;
+      })
+      .sort((a, b) =>
+        sortBy === "name"
+          ? a.name.localeCompare(b.name)
+          : new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      );
+  }, [projects, searchQuery, sortBy, statusFilter]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -78,6 +97,9 @@ export default function Dashboard() {
   const [clientName, setClientName] = useState("");
   const [clientEmail, setClientEmail] = useState("");
   const [limitDialogOpen, setLimitDialogOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | ProjectStatus>("all");
+  const [sortBy, setSortBy] = useState<"recent" | "name">("recent");
   const { toast } = useToast();
 
   // Revenue
@@ -700,7 +722,7 @@ export default function Dashboard() {
             <StatCard
               icon={<FolderOpen className="h-5 w-5" />}
               label="Active projects"
-              value={projects.length}
+              value={activeProjectCount}
             />
             <StatCard
               icon={<Clock className="h-5 w-5" />}
@@ -720,6 +742,46 @@ export default function Dashboard() {
           <ReminderBar
             projects={projects.filter((p) => p.pendingCount > 0)}
           />
+        )}
+
+        {!loading && projects.length > 0 && (
+          <div className="flex flex-col sm:flex-row gap-2 mb-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search projects or clients"
+                aria-label="Search projects or clients"
+                className="pl-9"
+                data-testid="input-project-search"
+              />
+            </div>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as "all" | ProjectStatus)}
+              aria-label="Filter projects by status"
+              className="h-10 rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+              data-testid="select-project-status"
+            >
+              <option value="all">All statuses</option>
+              {PROJECT_STATUSES.map((status) => (
+                <option key={status.value} value={status.value}>
+                  {status.label}
+                </option>
+              ))}
+            </select>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as "recent" | "name")}
+              aria-label="Sort projects"
+              className="h-10 rounded-md border border-input bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+              data-testid="select-project-sort"
+            >
+              <option value="recent">Newest first</option>
+              <option value="name">Name A–Z</option>
+            </select>
+          </div>
         )}
 
         {loading ? (
@@ -793,9 +855,29 @@ export default function Dashboard() {
               </div>
             </CardContent>
           </Card>
+        ) : visibleProjects.length === 0 ? (
+          <Card className="border-dashed">
+            <CardContent className="py-10 text-center">
+              <Search className="h-9 w-9 mx-auto text-muted-foreground mb-3" />
+              <h3 className="text-lg font-medium">No matching projects</h3>
+              <p className="text-muted-foreground mb-4">
+                Try a different search or clear your filters.
+              </p>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setSearchQuery("");
+                  setStatusFilter("all");
+                }}
+                data-testid="button-clear-project-filters"
+              >
+                Clear filters
+              </Button>
+            </CardContent>
+          </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {projects.map((p) => (
+            {visibleProjects.map((p) => (
               <Link
                 key={p.id}
                 href={"/projects/" + p.id}
