@@ -314,6 +314,16 @@ export default function ClientPortal() {
   const pendingCount = visibleFiles.filter(
     (f) => (f.review_status ?? (f.approved ? "approved" : "pending")) !== "approved",
   ).length;
+  const approvedCount = visibleFiles.filter(
+    (f) => (f.review_status ?? (f.approved ? "approved" : "pending")) === "approved",
+  ).length;
+  const changesRequestedCount = visibleFiles.filter(
+    (f) => f.review_status === "changes_requested",
+  ).length;
+  const awaitingReviewCount = Math.max(0, pendingCount - changesRequestedCount);
+  const progressPercent = visibleFiles.length
+    ? Math.round((approvedCount / visibleFiles.length) * 100)
+    : 0;
 
   return (
     <div className="min-h-screen bg-background">
@@ -326,26 +336,71 @@ export default function ClientPortal() {
         brandName={branding?.display_name}
         brandColor={accentColor}
       />
-      <main className="max-w-4xl mx-auto px-6 py-10">
-        <div className="mb-8">
-          <Badge variant="outline" className="mb-3">
-            Review portal
-          </Badge>
-          <h1 className="text-3xl font-semibold tracking-tight">
-            {project.name}
-          </h1>
-          <p className="text-muted-foreground mt-2">
-            Welcome, {project.client_name}. Review the files below, leave
-            feedback, and approve when you're ready.
-          </p>
-          {visibleFiles.length > 0 && (
-            <div className="mt-3 text-sm text-muted-foreground">
-              {pendingCount > 0
-                ? `${pendingCount} file${pendingCount === 1 ? "" : "s"} awaiting your review`
-                : "All files have been approved — thanks!"}
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+        <div className="mb-6 sm:mb-8">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div className="min-w-0">
+              <Badge variant="outline" className="mb-3">
+                Review portal
+              </Badge>
+              <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight break-words">
+                {project.name}
+              </h1>
+              <p className="text-muted-foreground mt-2 max-w-2xl">
+                Welcome, {project.client_name}. Review the files below, leave
+                feedback, and approve when you're ready.
+              </p>
             </div>
-          )}
+            {visibleFiles.length > 0 && (
+              <Badge
+                variant="secondary"
+                className="shrink-0 bg-primary/10 text-primary border-primary/20"
+              >
+                {approvedCount} of {visibleFiles.length} approved
+              </Badge>
+            )}
+          </div>
         </div>
+
+        {visibleFiles.length > 0 && (
+          <Card className="mb-6 border-primary/20 bg-primary/5">
+            <CardContent className="p-4 sm:p-5">
+              <div className="flex items-start justify-between gap-4 mb-3">
+                <div>
+                  <p className="font-medium">Review progress</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    {pendingCount > 0
+                      ? pendingCount + " file" + (pendingCount === 1 ? "" : "s") + " still need" + (pendingCount === 1 ? "s" : "") + " your attention"
+                      : "Everything is approved — thank you!"}
+                  </p>
+                </div>
+                <span className="text-lg font-semibold text-primary">
+                  {progressPercent}%
+                </span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-background">
+                <div
+                  className="h-full rounded-full bg-primary transition-all"
+                  style={{ width: progressPercent + "%" }}
+                />
+              </div>
+              <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+                <div className="rounded-md bg-background/70 px-2 py-2">
+                  <div className="text-lg font-semibold text-emerald-700">{approvedCount}</div>
+                  <div className="text-xs text-muted-foreground">Approved</div>
+                </div>
+                <div className="rounded-md bg-background/70 px-2 py-2">
+                  <div className="text-lg font-semibold text-amber-700">{changesRequestedCount}</div>
+                  <div className="text-xs text-muted-foreground">Changes requested</div>
+                </div>
+                <div className="rounded-md bg-background/70 px-2 py-2">
+                  <div className="text-lg font-semibold text-primary">{awaitingReviewCount}</div>
+                  <div className="text-xs text-muted-foreground">Awaiting review</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {visibleFiles.length === 0 ? (
           <Card className="border-dashed">
@@ -392,7 +447,7 @@ export default function ClientPortal() {
                           )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
                         {reviewStatus === "approved" ? (
                           <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 hover:bg-emerald-100">
                             <CheckCircle2 className="h-3 w-3 mr-1" />
@@ -418,9 +473,9 @@ export default function ClientPortal() {
                           rel="noopener noreferrer"
                           data-testid={`link-download-${f.id}`}
                         >
-                          <Button size="sm" variant="outline">
+                          <Button size="sm" variant="outline" className="w-full sm:w-auto">
                             <Download className="h-4 w-4 mr-2" />
-                            View
+                            View file
                           </Button>
                         </a>
                       </div>
@@ -455,7 +510,7 @@ export default function ClientPortal() {
                             rows={2}
                             data-testid={`input-feedback-${f.id}`}
                           />
-                          <div className="flex items-center justify-end gap-2 flex-wrap">
+                          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2">
                             <Button
                               size="sm"
                               variant="outline"
