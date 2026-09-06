@@ -695,25 +695,26 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Project stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
-          <StatCard
-            icon={<FolderOpen className="h-5 w-5" />}
-            label="Active projects"
-            value={projects.length}
-          />
-          <StatCard
-            icon={<Clock className="h-5 w-5" />}
-            label="Pending approvals"
-            value={totalPending}
-            highlight={totalPending > 0}
-          />
-          <StatCard
-            icon={<CheckCircle2 className="h-5 w-5" />}
-            label="Approved files"
-            value={totalApproved}
-          />
-        </div>
+        {projects.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+            <StatCard
+              icon={<FolderOpen className="h-5 w-5" />}
+              label="Active projects"
+              value={projects.length}
+            />
+            <StatCard
+              icon={<Clock className="h-5 w-5" />}
+              label="Pending approvals"
+              value={totalPending}
+              highlight={totalPending > 0}
+            />
+            <StatCard
+              icon={<CheckCircle2 className="h-5 w-5" />}
+              label="Approved files"
+              value={totalApproved}
+            />
+          </div>
+        )}
 
         {totalPending > 0 && (
           <ReminderBar
