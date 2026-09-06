@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useRoute } from "wouter";
+import { Link, useLocation, useRoute } from "wouter";
 import { format, formatDistanceToNow } from "date-fns";
 import {
   ArrowLeft,
@@ -57,6 +57,12 @@ import { useAuth } from "@/lib/auth";
 const MAX_FILE_SIZE_MB = 50;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
+function generateShareToken() {
+  const arr = new Uint8Array(16);
+  crypto.getRandomValues(arr);
+  return Array.from(arr, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -99,6 +105,7 @@ const EVENT_META: Record<
 
 export default function ProjectDetail() {
   const [, params] = useRoute("/projects/:id");
+  const [, setLocation] = useLocation();
   const projectId = params?.id;
   const { user, signOut } = useAuth();
   const [project, setProject] = useState<Project | null>(null);
@@ -110,6 +117,7 @@ export default function ProjectDetail() {
   const [versioningFileId, setVersioningFileId] = useState<string | null>(null);
   const [legacyFileSchema, setLegacyFileSchema] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [duplicating, setDuplicating] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
   const [renameValue, setRenameValue] = useState("");
   const [renaming, setRenaming] = useState(false);
@@ -535,6 +543,37 @@ export default function ProjectDetail() {
     toast({ title: "Project renamed" });
   }
 
+  async function handleDuplicate() {
+    if (!project || !user || duplicating) return;
+
+    setDuplicating(true);
+    const duplicateName = project.name + " copy";
+    const { error } = await supabase.from("projects").insert({
+      name: duplicateName,
+      client_name: project.client_name,
+      client_email: project.client_email,
+      status: "active",
+      share_token: generateShareToken(),
+      user_id: user.id,
+    });
+    setDuplicating(false);
+
+    if (error) {
+      const hitFreeLimit = error.message.includes("FREE_PROJECT_LIMIT_REACHED");
+      toast({
+        title: hitFreeLimit ? "Free project limit reached" : "Couldn't duplicate project",
+        description: hitFreeLimit
+          ? "Archive an active project or upgrade to Pro to create another one."
+          : error.message,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    toast({ title: "Project duplicated" });
+    setLocation("/");
+  }
+
   function shareUrl() {
     if (!project) return "";
     return `${window.location.origin}${import.meta.env.BASE_URL}client/${project.share_token}`;
@@ -742,7 +781,16 @@ export default function ProjectDetail() {
               {project.client_name} · {project.client_email}
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              onClick={handleDuplicate}
+              disabled={duplicating}
+              data-testid="button-duplicate-project"
+            >
+              <Copy className="h-4 w-4 mr-2" />
+              {duplicating ? "Duplicating..." : "Duplicate"}
+            </Button>
             <Dialog open={invoiceOpen} onOpenChange={setInvoiceOpen}>
               <DialogTrigger asChild>
                 <Button
