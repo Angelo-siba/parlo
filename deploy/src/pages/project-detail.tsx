@@ -21,6 +21,7 @@ import {
   History,
   RefreshCw,
   Pencil,
+  Archive,
 } from "lucide-react";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
@@ -110,6 +111,7 @@ export default function ProjectDetail() {
   const [versioningFileId, setVersioningFileId] = useState<string | null>(null);
   const [legacyFileSchema, setLegacyFileSchema] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [statusToConfirm, setStatusToConfirm] = useState<ProjectStatus | null>(null);
   const [renameOpen, setRenameOpen] = useState(false);
   const [renameValue, setRenameValue] = useState("");
   const [renaming, setRenaming] = useState(false);
@@ -489,6 +491,15 @@ export default function ProjectDetail() {
     loadAll();
   }
 
+  function requestStatusChange(newStatus: ProjectStatus) {
+    if (!project || newStatus === project.status) return;
+    if (newStatus === "archived" || project.status === "archived") {
+      setStatusToConfirm(newStatus);
+      return;
+    }
+    handleStatusChange(newStatus);
+  }
+
   async function handleStatusChange(newStatus: ProjectStatus) {
     if (!project || updatingStatus) return;
     setUpdatingStatus(true);
@@ -719,7 +730,7 @@ export default function ProjectDetail() {
               <select
                 value={project.status}
                 disabled={updatingStatus}
-                onChange={(e) => handleStatusChange(e.target.value as ProjectStatus)}
+                onChange={(e) => requestStatusChange(e.target.value as ProjectStatus)}
                 className={`text-xs font-medium rounded-full border px-3 py-1 cursor-pointer outline-none transition-opacity ${updatingStatus ? "opacity-50" : ""} ${
                   project.status === "draft"
                     ? "bg-gray-100 text-gray-600 border-gray-200"
@@ -729,6 +740,9 @@ export default function ProjectDetail() {
                     ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                     : "bg-muted text-muted-foreground border-border"
                 }`}
+                aria-label="Project status"
+                title="Change project status"
+                data-testid="select-project-status"
               >
                 {PROJECT_STATUSES.map((s) => (
                   <option key={s.value} value={s.value}>
@@ -924,6 +938,52 @@ export default function ProjectDetail() {
                 </Button>
               </DialogFooter>
             </form>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog
+          open={statusToConfirm !== null}
+          onOpenChange={(open) => {
+            if (!open && !updatingStatus) setStatusToConfirm(null);
+          }}
+        >
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>
+                {statusToConfirm === "archived"
+                  ? "Archive this project?"
+                  : "Restore this project?"}
+              </DialogTitle>
+              <DialogDescription>
+                {statusToConfirm === "archived"
+                  ? "The project will stay in your account, but it will no longer be treated as active. You can restore it later."
+                  : "This project will return to your active workspace and be available for ongoing work again."}
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setStatusToConfirm(null)}
+                disabled={updatingStatus}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant={statusToConfirm === "archived" ? "destructive" : "default"}
+                onClick={() => {
+                  const nextStatus = statusToConfirm;
+                  setStatusToConfirm(null);
+                  if (nextStatus) handleStatusChange(nextStatus);
+                }}
+                disabled={updatingStatus || statusToConfirm === null}
+                data-testid="button-confirm-status"
+              >
+                <Archive className="h-4 w-4 mr-2" />
+                {statusToConfirm === "archived" ? "Archive project" : "Restore project"}
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
 
