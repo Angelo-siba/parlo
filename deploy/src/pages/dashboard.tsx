@@ -726,20 +726,70 @@ export default function Dashboard() {
             Loading projects…
           </div>
         ) : projects.length === 0 ? (
-          <Card className="border-dashed">
-            <CardContent className="py-12 text-center">
-              <FolderOpen className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
-              <h3 className="text-lg font-medium">No projects yet</h3>
-              <p className="text-muted-foreground mb-4">
-                Create your first project to start sharing files with clients.
-              </p>
-              <Button
-                onClick={() => setOpen(true)}
-                data-testid="button-create-first-project"
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                New project
-              </Button>
+          <Card className="overflow-hidden border-primary/20 bg-primary/5">
+            <CardContent className="p-0">
+              <div className="grid lg:grid-cols-[0.9fr_1.1fr]">
+                <div className="p-6 sm:p-8">
+                  <Badge className="mb-4 bg-primary/10 text-primary border-primary/20 hover:bg-primary/10">
+                    Your first project
+                  </Badge>
+                  <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight max-w-md">
+                    A smoother way to send work to clients.
+                  </h2>
+                  <p className="text-muted-foreground mt-3 max-w-md">
+                    Create a project, upload your deliverables, and give your client one simple place to review everything.
+                  </p>
+                  <Button
+                    className="mt-6"
+                    onClick={() => setOpen(true)}
+                    data-testid="button-create-first-project"
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Create your first project
+                  </Button>
+                </div>
+
+                <div className="border-t lg:border-t-0 lg:border-l border-primary/10 bg-background/65 p-6 sm:p-8">
+                  <p className="text-sm font-semibold text-foreground mb-5">
+                    How Parlo works
+                  </p>
+                  <div className="space-y-5">
+                    <div className="flex gap-3">
+                      <div className="h-9 w-9 shrink-0 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                        <FolderOpen className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm">1. Create a project</p>
+                        <p className="text-sm text-muted-foreground mt-0.5">
+                          Add the project name and your client’s details.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex gap-3">
+                      <div className="h-9 w-9 shrink-0 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                        <Upload className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm">2. Upload your work</p>
+                        <p className="text-sm text-muted-foreground mt-0.5">
+                          Share files through a private client portal.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex gap-3">
+                      <div className="h-9 w-9 shrink-0 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                        <CheckCircle2 className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm">3. Get clear approvals</p>
+                        <p className="text-sm text-muted-foreground mt-0.5">
+                          See feedback, approvals, and outstanding work in one place.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
         ) : (
