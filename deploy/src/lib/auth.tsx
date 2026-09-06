@@ -29,19 +29,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isRecovery, setIsRecovery] = useState(false);
 
   useEffect(() => {
-    supabase.auth
-      .getSession()
-      .then(({ data }) => {
-        setSession(data.session);
-        setUser(data.session?.user ?? null);
-        setLoading(false);
-      })
-      .catch((error) => {
-        console.error("[Parlo] session restore failed", error);
-        setSession(null);
-        setUser(null);
-        setLoading(false);
-      });
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      setUser(data.session?.user ?? null);
+      setLoading(false);
+    });
 
     const { data: listener } = supabase.auth.onAuthStateChange((event, s) => {
       setSession(s);
