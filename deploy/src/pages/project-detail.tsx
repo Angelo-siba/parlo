@@ -29,6 +29,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -116,6 +117,9 @@ export default function ProjectDetail() {
   const [renameValue, setRenameValue] = useState("");
   const [renaming, setRenaming] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [updateOpen, setUpdateOpen] = useState(false);
+  const [updateSubject, setUpdateSubject] = useState("");
+  const [updateBody, setUpdateBody] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const versionFileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -558,15 +562,61 @@ export default function ProjectDetail() {
     setTimeout(() => setCopied(false), 1800);
   }
 
-  function emailClientLink() {
-    if (!project) return "";
-    const subject = encodeURIComponent(
-      `Files ready for your review: ${project.name}`,
+  function openClientUpdate() {
+    if (!project) return;
+    const pendingFiles = visibleFiles.filter(
+      (file) =>
+        (file.review_status ?? (file.approved ? "approved" : "pending")) !==
+        "approved",
     );
-    const body = encodeURIComponent(
-      `Hi ${project.client_name},\n\nThe files for ${project.name} are ready for your review.\n\nReview here: ${shareUrl()}\n\nThanks!`,
+    const changesRequested = visibleFiles.filter(
+      (file) => file.review_status === "changes_requested",
     );
-    return `mailto:${project.client_email}?subject=${subject}&body=${body}`;
+    const unpaidInvoices = invoices.filter((invoice) => invoice.status !== "paid");
+    const totalOutstanding = unpaidInvoices.reduce(
+      (sum, invoice) => sum + invoice.total_amount,
+      0,
+    );
+    const subject = pendingFiles.length
+      ? `Files ready for your review: ${project.name}`
+      : `Project update: ${project.name}`;
+    const lines = [
+      `Hi ${project.client_name},`,
+      "",
+      pendingFiles.length
+        ? `I’ve shared ${pendingFiles.length} file${pendingFiles.length === 1 ? "" : "s"} for your review.`
+        : visibleFiles.length
+          ? "All shared files have been approved — thank you!"
+          : "I’m getting the project files ready and will share an update soon.",
+    ];
+    if (changesRequested.length > 0) {
+      lines.push(`I’ve noted ${changesRequested.length} requested change${changesRequested.length === 1 ? "" : "s"} and will follow up there.`);
+    }
+    if (totalOutstanding > 0) {
+      lines.push(`There is an outstanding invoice balance of ${totalOutstanding.toFixed(2)}.`);
+    }
+    lines.push("", `Review everything here: ${shareUrl()}`, "", "Thanks!");
+    setUpdateSubject(subject);
+    setUpdateBody(lines.join("\n"));
+    setUpdateOpen(true);
+  }
+
+  function updateMailtoLink() {
+    if (!project) return "#";
+    return `mailto:${project.client_email}?subject=${encodeURIComponent(updateSubject)}&body=${encodeURIComponent(updateBody)}`;
+  }
+
+  async function copyClientUpdate() {
+    try {
+      await navigator.clipboard.writeText(`Subject: ${updateSubject}\n\n${updateBody}`);
+      toast({ title: "Update copied" });
+    } catch {
+      toast({
+        title: "Couldn’t copy update",
+        description: "Select the message text and copy it manually.",
+        variant: "destructive",
+      });
+    }
   }
 
   function reminderEmailLink() {
@@ -882,12 +932,57 @@ export default function ProjectDetail() {
                 </form>
               </DialogContent>
             </Dialog>
-            <a href={emailClientLink()}>
-              <Button variant="outline" data-testid="button-email-client">
-                <Mail className="h-4 w-4 mr-2" />
-                Email client
-              </Button>
-            </a>
+            <Dialog open={updateOpen} onOpenChange={setUpdateOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  onClick={openClientUpdate}
+                  data-testid="button-email-client"
+                >
+                  <Mail className="h-4 w-4 mr-2" />
+                  Draft client update
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-lg">
+                <DialogHeader>
+                  <DialogTitle>Draft a client update</DialogTitle>
+                  <DialogDescription>
+                    Parlo pulled in the current review and invoice status. Edit the message, then copy it or open it in your email app.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="client-update-subject">Subject</Label>
+                    <Input
+                      id="client-update-subject"
+                      value={updateSubject}
+                      onChange={(e) => setUpdateSubject(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="client-update-body">Message</Label>
+                    <Textarea
+                      id="client-update-body"
+                      value={updateBody}
+                      onChange={(e) => setUpdateBody(e.target.value)}
+                      rows={10}
+                    />
+                  </div>
+                </div>
+                <DialogFooter className="flex-col-reverse sm:flex-row sm:justify-between gap-2">
+                  <Button type="button" variant="ghost" onClick={copyClientUpdate}>
+                    <Copy className="h-4 w-4 mr-2" />
+                    Copy update
+                  </Button>
+                  <Button asChild disabled={!updateSubject.trim() || !updateBody.trim()}>
+                    <a href={updateMailtoLink()}>
+                      <Mail className="h-4 w-4 mr-2" />
+                      Open email
+                    </a>
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
             <Button
               variant="outline"
               onClick={handleSendReminder}
