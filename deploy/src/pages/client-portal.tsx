@@ -138,28 +138,33 @@ export default function ClientPortal() {
       amount: inv.total_amount.toFixed(2),
       currency_code: "USD",
       no_shipping: "1",
+      no_note: "1",
+      invoice: inv.invoice_number,
+      custom: inv.id,
+      return: shareUrl(),
+      cancel_return: shareUrl(),
+      rm: "2",
+      charset: "utf-8",
     });
     return `https://www.paypal.com/cgi-bin/webscr?${params.toString()}`;
   }
 
-  async function payNow(inv: Invoice) {
+  function payNow(inv: Invoice) {
     setPayingId(inv.id);
-    window.open(payPalLink(inv), "_blank", "noopener,noreferrer");
-    const { error } = await supabase
-      .from("invoices")
-      .update({ status: "paid" })
-      .eq("id", inv.id);
+    const paypalWindow = window.open(payPalLink(inv), "_blank", "noopener,noreferrer");
     setPayingId(null);
-    if (error) {
+    if (!paypalWindow) {
       toast({
-        title: "Couldn't update invoice status",
-        description: error.message,
+        title: "PayPal couldn't open",
+        description: "Allow pop-ups for this site, then try again.",
         variant: "destructive",
       });
       return;
     }
-    toast({ title: "Opening PayPal — thanks!" });
-    load();
+    toast({
+      title: "PayPal opened",
+      description: "Complete payment on PayPal. This invoice will remain awaiting confirmation until the freelancer confirms receipt.",
+    });
   }
 
   useEffect(() => {
@@ -598,8 +603,11 @@ export default function ClientPortal() {
                             data-testid={`button-pay-now-${inv.id}`}
                           >
                             <ExternalLink className="h-4 w-4 mr-2" />
-                            Pay Now
+                            Pay via PayPal
                           </Button>
+                          <span className="max-w-[170px] text-right text-xs text-muted-foreground">
+                            Payment opens on PayPal. The freelancer will confirm receipt.
+                          </span>
                         )}
                       </div>
                     </div>
