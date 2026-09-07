@@ -65,7 +65,6 @@ export default function ClientPortal() {
     {},
   );
   const [savingId, setSavingId] = useState<string | null>(null);
-  const [payingId, setPayingId] = useState<string | null>(null);
   const { toast } = useToast();
 
   const fileGroups = useMemo(() => {
@@ -147,24 +146,6 @@ export default function ClientPortal() {
       charset: "utf-8",
     });
     return `https://www.paypal.com/cgi-bin/webscr?${params.toString()}`;
-  }
-
-  function payNow(inv: Invoice) {
-    setPayingId(inv.id);
-    const paypalWindow = window.open(payPalLink(inv), "_blank", "noopener,noreferrer");
-    setPayingId(null);
-    if (!paypalWindow) {
-      toast({
-        title: "PayPal couldn't open",
-        description: "Allow pop-ups for this site, then try again.",
-        variant: "destructive",
-      });
-      return;
-    }
-    toast({
-      title: "PayPal opened",
-      description: "Complete payment on PayPal. This invoice will remain awaiting confirmation until the freelancer confirms receipt.",
-    });
   }
 
   useEffect(() => {
@@ -598,12 +579,17 @@ export default function ClientPortal() {
                           </Badge>
                         ) : (
                           <Button
-                            onClick={() => payNow(inv)}
-                            disabled={payingId === inv.id}
+                            asChild
                             data-testid={`button-pay-now-${inv.id}`}
                           >
-                            <ExternalLink className="h-4 w-4 mr-2" />
-                            Pay via PayPal
+                            <a
+                              href={payPalLink(inv)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <ExternalLink className="h-4 w-4 mr-2" />
+                              Pay via PayPal
+                            </a>
                           </Button>
                         )}
                         {inv.status !== "paid" && (
