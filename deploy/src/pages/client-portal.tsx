@@ -605,6 +605,8 @@ export default function ClientPortal() {
                             <ExternalLink className="h-4 w-4 mr-2" />
                             Pay via PayPal
                           </Button>
+                        )}
+                        {inv.status !== "paid" && (
                           <span className="max-w-[170px] text-right text-xs text-muted-foreground">
                             Payment opens on PayPal. The freelancer will confirm receipt.
                           </span>
