@@ -658,21 +658,10 @@ export default function ProjectDetail() {
         (file.review_status ?? (file.approved ? "approved" : "pending")) ===
         "approved",
     );
-    if (approvedFiles.length === 0) {
-      toast({
-        title: "Handoff not ready",
-        description: "Upload at least one file before creating a handoff.",
-      });
-      return;
-    }
-    if (approvedFiles.length !== visibleFiles.length) {
-      toast({
-        title: "Handoff not ready",
-        description:
-          pendingCount === 1
-            ? "1 file still needs approval before you can create the handoff."
-            : pendingCount + " files still need approval before you can create the handoff.",
-      });
+    if (approvedFiles.length === 0 || approvedFiles.length !== visibleFiles.length) {
+      setHandoffSubject("");
+      setHandoffBody("");
+      setHandoffOpen(true);
       return;
     }
     const latestApproval = approvedFiles
@@ -859,6 +848,13 @@ export default function ProjectDetail() {
     (f) => (f.review_status ?? (f.approved ? "approved" : "pending")) !== "approved",
   ).length;
   const approvedCount = visibleFiles.length - pendingCount;
+  const handoffReady = visibleFiles.length > 0 && pendingCount === 0;
+  const handoffBlockerMessage =
+    visibleFiles.length === 0
+      ? "Add at least one file before a handoff summary can be drafted."
+      : pendingCount === 1
+        ? "Approve the remaining file before a handoff summary can be drafted."
+        : "Approve the remaining " + pendingCount + " files before a handoff summary can be drafted.";
 
 
   return (
@@ -1071,6 +1067,11 @@ export default function ProjectDetail() {
                       A polished completion summary with approved files, the client portal link, and invoice status.
                     </DialogDescription>
                   </DialogHeader>
+                  {!handoffReady && (
+                    <p className="rounded-md bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+                      {handoffBlockerMessage}
+                    </p>
+                  )}
                   <div className="space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="handoff-subject">Subject</Label>
@@ -1078,6 +1079,7 @@ export default function ProjectDetail() {
                         id="handoff-subject"
                         value={handoffSubject}
                         onChange={(e) => setHandoffSubject(e.target.value)}
+                        disabled={!handoffReady}
                       />
                     </div>
                     <div className="space-y-2">
@@ -1087,15 +1089,17 @@ export default function ProjectDetail() {
                         value={handoffBody}
                         onChange={(e) => setHandoffBody(e.target.value)}
                         rows={14}
+                        disabled={!handoffReady}
+                        placeholder={handoffReady ? "Your handoff summary will appear here." : "The handoff summary will appear here once the project is fully approved."}
                       />
                     </div>
                   </div>
                   <DialogFooter className="flex-col-reverse sm:flex-row sm:justify-between gap-2">
-                    <Button type="button" variant="ghost" onClick={copyHandoff}>
+                    <Button type="button" variant="ghost" onClick={copyHandoff} disabled={!handoffReady}>
                       <Copy className="h-4 w-4 mr-2" />
                       Copy handoff
                     </Button>
-                    <Button asChild disabled={!handoffSubject.trim() || !handoffBody.trim()}>
+                    <Button asChild disabled={!handoffReady || !handoffSubject.trim() || !handoffBody.trim()}>
                       <a href={handoffMailtoLink()}>
                         <Mail className="h-4 w-4 mr-2" />
                         Open email
