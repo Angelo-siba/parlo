@@ -297,6 +297,30 @@ export default function ProjectDetail() {
     loadAll();
   }
 
+  async function markInvoicePaid(inv: Invoice) {
+    const { error } = await supabase
+      .from("invoices")
+      .update({ status: "paid" })
+      .eq("id", inv.id);
+    if (error) {
+      toast({
+        title: "Couldn't update invoice",
+        description: error.message,
+        variant: "destructive",
+      });
+      return;
+    }
+    setInvoices((current) =>
+      current.map((item) =>
+        item.id === inv.id ? { ...item, status: "paid" } : item,
+      ),
+    );
+    toast({
+      title: "Invoice marked as paid",
+      description: inv.invoice_number + " is now recorded as paid.",
+    });
+  }
+
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const fileList = e.target.files;
     if (!fileList || fileList.length === 0 || !project) return;
@@ -1594,6 +1618,15 @@ export default function ProjectDetail() {
                               <Clock className="h-3 w-3 mr-1" />
                               Awaiting payment
                             </Badge>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => void markInvoicePaid(inv)}
+                              data-testid={`button-mark-invoice-paid-${inv.id}`}
+                            >
+                              <CheckCircle2 className="h-4 w-4 mr-1.5" />
+                              Mark paid
+                            </Button>
                             <Button
                               variant="outline"
                               size="sm"
