@@ -23,7 +23,6 @@ import {
   RefreshCw,
   Pencil,
   Archive,
-  Lock,
 } from "lucide-react";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
@@ -659,7 +658,23 @@ export default function ProjectDetail() {
         (file.review_status ?? (file.approved ? "approved" : "pending")) ===
         "approved",
     );
-    if (approvedFiles.length === 0 || approvedFiles.length !== visibleFiles.length) return;
+    if (approvedFiles.length === 0) {
+      toast({
+        title: "Handoff not ready",
+        description: "Upload at least one file before creating a handoff.",
+      });
+      return;
+    }
+    if (approvedFiles.length !== visibleFiles.length) {
+      toast({
+        title: "Handoff not ready",
+        description:
+          pendingCount === 1
+            ? "1 file still needs approval before you can create the handoff."
+            : pendingCount + " files still need approval before you can create the handoff.",
+      });
+      return;
+    }
     const latestApproval = approvedFiles
       .filter((file) => file.approved_at)
       .sort(
@@ -844,13 +859,7 @@ export default function ProjectDetail() {
     (f) => (f.review_status ?? (f.approved ? "approved" : "pending")) !== "approved",
   ).length;
   const approvedCount = visibleFiles.length - pendingCount;
-  const handoffLocked = visibleFiles.length === 0 || pendingCount > 0;
-  const handoffLockMessage =
-    visibleFiles.length === 0
-      ? "Add at least one file to unlock the handoff."
-      : pendingCount === 1
-        ? "1 file still needs approval before the handoff unlocks."
-        : pendingCount + " files still need approval before the handoff unlocks.";
+
 
   return (
     <div className="min-h-screen bg-background">
@@ -1040,24 +1049,18 @@ export default function ProjectDetail() {
               </DialogContent>
             </Dialog>
             {isPro && !billingLoading && (
-              <div className="flex flex-col items-stretch sm:items-end gap-1">
-                <Dialog open={handoffOpen} onOpenChange={setHandoffOpen}>
+              <Dialog open={handoffOpen} onOpenChange={setHandoffOpen}>
                 <DialogTrigger asChild>
                   <Button
                     variant="outline"
                     onClick={openHandoff}
-                    disabled={handoffLocked}
-                    title={handoffLocked ? handoffLockMessage : "Create a Pro handoff pack"}
+                    title="Create a Pro handoff pack"
                     data-testid="button-create-handoff"
                   >
-                    {handoffLocked ? (
-                      <Lock className="h-4 w-4 mr-2" />
-                    ) : (
-                      <PackageCheck className="h-4 w-4 mr-2" />
-                    )}
-                    {handoffLocked ? "Handoff locked" : "Create handoff"}
+                    <PackageCheck className="h-4 w-4 mr-2" />
+                    Create handoff
                     <Badge className="ml-2 bg-primary/10 text-primary border-primary/20 hover:bg-primary/10">
-                      {handoffLocked ? "Approval required" : "Pro"}
+                      Pro
                     </Badge>
                   </Button>
                 </DialogTrigger>
@@ -1100,12 +1103,7 @@ export default function ProjectDetail() {
                     </Button>
                   </DialogFooter>
                 </DialogContent>
-                </Dialog>
-                <p className="flex max-w-[260px] items-center gap-1 text-right text-xs text-muted-foreground">
-                  <Lock className="h-3 w-3 shrink-0" />
-                  {handoffLocked ? handoffLockMessage : "All files approved — your handoff is ready."}
-                </p>
-              </div>
+              </Dialog>
             )}
 
             <Dialog open={updateOpen} onOpenChange={setUpdateOpen}>
