@@ -128,6 +128,10 @@ export default function ClientPortal() {
     setLoading(false);
   }
 
+  function shareUrl() {
+    return window.location.href;
+  }
+
   function payPalLink(inv: Invoice) {
     if (!project) return "#";
     const params = new URLSearchParams({
