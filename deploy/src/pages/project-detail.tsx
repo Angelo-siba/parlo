@@ -16,6 +16,7 @@ import {
   Activity,
   Receipt,
   Plus,
+  PackageCheck,
   X,
   Bell,
   History,
@@ -55,6 +56,11 @@ import {
   isReviewWorkflowSchemaError,
 } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
+import {
+  BillingSubscription,
+  isActiveSubscription,
+  isProUser,
+} from "@/lib/billing";
 
 const MAX_FILE_SIZE_MB = 50;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
@@ -103,6 +109,8 @@ export default function ProjectDetail() {
   const [, params] = useRoute("/projects/:id");
   const projectId = params?.id;
   const { user, signOut } = useAuth();
+  const [isPro, setIsPro] = useState(() => isProUser(user));
+  const [billingLoading, setBillingLoading] = useState(Boolean(user));
   const [project, setProject] = useState<Project | null>(null);
   const [files, setFiles] = useState<ProjectFile[]>([]);
   const [activity, setActivity] = useState<ActivityLog[]>([]);
@@ -120,6 +128,9 @@ export default function ProjectDetail() {
   const [updateOpen, setUpdateOpen] = useState(false);
   const [updateSubject, setUpdateSubject] = useState("");
   const [updateBody, setUpdateBody] = useState("");
+  const [handoffOpen, setHandoffOpen] = useState(false);
+  const [handoffSubject, setHandoffSubject] = useState("");
+  const [handoffBody, setHandoffBody] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const versionFileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -132,6 +143,26 @@ export default function ProjectDetail() {
   ]);
   const [dueDate, setDueDate] = useState("");
   const [paypalEmail, setPaypalEmail] = useState("");
+
+  async function loadSubscription() {
+    if (!user) {
+      setIsPro(false);
+      setBillingLoading(false);
+      return;
+    }
+    setBillingLoading(true);
+    const { data, error } = await supabase
+      .from("subscriptions")
+      .select("status, ends_at")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (!error && data) {
+      setIsPro(isActiveSubscription(data as BillingSubscription));
+    } else {
+      setIsPro(isProUser(user));
+    }
+    setBillingLoading(false);
+  }
 
   async function loadAll() {
     if (!projectId) return;
@@ -182,8 +213,9 @@ export default function ProjectDetail() {
 
   useEffect(() => {
     loadAll();
+    loadSubscription();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId]);
+  }, [projectId, user]);
 
   function openInvoiceDialog() {
     const next = invoices.length + 1;
@@ -619,6 +651,73 @@ export default function ProjectDetail() {
     }
   }
 
+  function openHandoff() {
+    if (!project || !isPro) return;
+    const approvedFiles = visibleFiles.filter(
+      (file) =>
+        (file.review_status ?? (file.approved ? "approved" : "pending")) ===
+        "approved",
+    );
+    if (approvedFiles.length === 0 || approvedFiles.length !== visibleFiles.length) return;
+    const latestApproval = approvedFiles
+      .filter((file) => file.approved_at)
+      .sort(
+        (a, b) =>
+          new Date(b.approved_at as string).getTime() -
+          new Date(a.approved_at as string).getTime(),
+      )[0];
+    const unpaidInvoices = invoices.filter((invoice) => invoice.status !== "paid");
+    const outstanding = unpaidInvoices.reduce(
+      (sum, invoice) => sum + invoice.total_amount,
+      0,
+    );
+    const subject = "Project handoff: " + project.name;
+    const lines = [
+      "Hi " + project.client_name + ",",
+      "",
+      "Everything for " + project.name + " has been approved. Here is your final handoff:",
+      "",
+      "Approved on: " +
+        (latestApproval?.approved_at
+          ? format(new Date(latestApproval.approved_at), "MMM d, yyyy")
+          : format(new Date(), "MMM d, yyyy")),
+      "",
+      "Approved deliverables:",
+      ...approvedFiles.map((file) => "- " + file.file_name + ": " + file.file_url),
+      "",
+      "Client portal: " + shareUrl(),
+    ];
+    if (outstanding > 0) {
+      lines.push("", "Outstanding invoice balance: $" + outstanding.toFixed(2));
+    } else {
+      lines.push("", "Invoice status: paid in full");
+    }
+    lines.push("", "Thanks for working together!");
+    setHandoffSubject(subject);
+    setHandoffBody(lines.join("\n"));
+    setHandoffOpen(true);
+  }
+
+  function handoffMailtoLink() {
+    if (!project) return "#";
+    return "mailto:" + project.client_email +
+      "?subject=" + encodeURIComponent(handoffSubject) +
+      "&body=" + encodeURIComponent(handoffBody);
+  }
+
+  async function copyHandoff() {
+    try {
+      await navigator.clipboard.writeText("Subject: " + handoffSubject + "\n\n" + handoffBody);
+      toast({ title: "Handoff copied" });
+    } catch {
+      toast({
+        title: "Couldn’t copy handoff",
+        description: "Select the handoff text and copy it manually.",
+        variant: "destructive",
+      });
+    }
+  }
+
   function reminderEmailLink() {
     if (!project) return "";
     const pendingFiles = visibleFiles.filter(
@@ -932,6 +1031,63 @@ export default function ProjectDetail() {
                 </form>
               </DialogContent>
             </Dialog>
+            {isPro && !billingLoading && (
+              <Dialog open={handoffOpen} onOpenChange={setHandoffOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    onClick={openHandoff}
+                    disabled={visibleFiles.length === 0 || pendingCount > 0}
+                    title={pendingCount > 0 ? "Approve all files to create a handoff" : "Create a Pro handoff pack"}
+                    data-testid="button-create-handoff"
+                  >
+                    <PackageCheck className="h-4 w-4 mr-2" />
+                    Create handoff
+                    <Badge className="ml-2 bg-primary/10 text-primary border-primary/20 hover:bg-primary/10">Pro</Badge>
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-lg">
+                  <DialogHeader>
+                    <DialogTitle>Project handoff pack</DialogTitle>
+                    <DialogDescription>
+                      A polished completion summary with approved files, the client portal link, and invoice status.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="handoff-subject">Subject</Label>
+                      <Input
+                        id="handoff-subject"
+                        value={handoffSubject}
+                        onChange={(e) => setHandoffSubject(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="handoff-body">Handoff message</Label>
+                      <Textarea
+                        id="handoff-body"
+                        value={handoffBody}
+                        onChange={(e) => setHandoffBody(e.target.value)}
+                        rows={14}
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter className="flex-col-reverse sm:flex-row sm:justify-between gap-2">
+                    <Button type="button" variant="ghost" onClick={copyHandoff}>
+                      <Copy className="h-4 w-4 mr-2" />
+                      Copy handoff
+                    </Button>
+                    <Button asChild disabled={!handoffSubject.trim() || !handoffBody.trim()}>
+                      <a href={handoffMailtoLink()}>
+                        <Mail className="h-4 w-4 mr-2" />
+                        Open email
+                      </a>
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            )}
+
             <Dialog open={updateOpen} onOpenChange={setUpdateOpen}>
               <DialogTrigger asChild>
                 <Button
