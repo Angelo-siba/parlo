@@ -26,7 +26,7 @@ const descriptions: Record<Mode, string> = {
 };
 
 export default function AuthPage() {
-  const [mode, setMode] = useState<Mode>(() =>\n    new URLSearchParams(window.location.search).get("mode") === "signup" ? "signup" : "login",\n  );
+  const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
