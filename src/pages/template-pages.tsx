@@ -86,19 +86,19 @@ export function usePageMetadata(title: string, description: string) {
 
     document.title = title;
 
-    const setMeta = (selector: string, attribute: "name" | "property", content: string) => {
-      let meta = document.querySelector<HTMLMetaElement>(selector);
+    const setMeta = (attribute: "name" | "property", key: string, content: string) => {
+      let meta = document.head.querySelector<HTMLMetaElement>(`meta[${attribute}="${key}"]`);
       if (!meta) {
         meta = document.createElement("meta");
-        meta.setAttribute(attribute, selector.includes("property") ? selector.split('="')[1].replace('"', "") : "description");
+        meta.setAttribute(attribute, key);
         document.head.appendChild(meta);
       }
       meta.content = content;
     };
 
-    setMeta('meta[name="description"]', "name", description);
-    setMeta('meta[property="og:title"]', "property", title);
-    setMeta('meta[property="og:description"]', "property", description);
+    setMeta("name", "description", description);
+    setMeta("property", "og:title", title);
+    setMeta("property", "og:description", description);
 
     return () => {
       document.title = previousTitle;
