@@ -28,7 +28,7 @@ export default function TemplatesPage() {
           </div>
         </section>
 
-        <section className="mx-auto max-w-6xl px-5 py-16 sm:px-8 sm:py-20"><div className="rounded-2xl bg-[#1C1814] px-7 py-10 text-[#F0EBE3] sm:px-12"><p className="max-w-2xl text-3xl font-bold leading-tight sm:text-4xl" style={{ fontFamily: "Georgia, serif" }}>Less admin. Better client work.</p><p className="mt-4 max-w-xl text-base leading-7 text-[#D8CEC2]">Parlo brings scope, feedback, files, and invoices together in one shareable client link — no client login required.</p><a href="/" className="mt-7 inline-flex items-center gap-2 rounded-full bg-[#C84A1A] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#A83D15]">Try Parlo for free <ArrowRight className="h-4 w-4" /></a></div></section>
+        <section className="mx-auto max-w-6xl px-5 py-16 sm:px-8 sm:py-20"><div className="rounded-2xl bg-[#1C1814] px-7 py-10 text-[#F0EBE3] sm:px-12"><p className="max-w-2xl text-3xl font-bold leading-tight sm:text-4xl" style={{ fontFamily: "Georgia, serif" }}>Less admin. Better client work.</p><p className="mt-4 max-w-xl text-base leading-7 text-[#D8CEC2]">Parlo brings scope, feedback, files, and invoices together in one shareable client link — no client login required.</p><a href="/signup" className="mt-7 inline-flex items-center gap-2 rounded-full bg-[#C84A1A] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#A83D15]">Try Parlo for free <ArrowRight className="h-4 w-4" /></a></div></section>
       </main>
       <footer className="border-t border-[#D8CEC2] px-5 py-8 sm:px-8"><div className="mx-auto max-w-6xl text-sm text-[#6E6258]">© Parlo · Free resources for better client work.</div></footer>
     </div>
