@@ -8,6 +8,8 @@ import ProjectDetail from "@/pages/project-detail";
 import ClientPortal from "@/pages/client-portal";
 import AuthPage from "@/pages/auth";
 import ResetPasswordPage from "@/pages/reset-password";
+import TemplatesPage from "@/pages/templates";
+import { ClientBriefTemplatePage, LatePaymentTemplatePage, ScopeOfWorkTemplatePage } from "@/pages/template-pages";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -17,25 +19,22 @@ function ProtectedRouter() {
   const [location] = useLocation();
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center text-muted-foreground">
-        Loading…
-      </div>
-    );
+    return <div className="min-h-screen bg-background flex items-center justify-center text-muted-foreground">Loading…</div>;
   }
 
-  if (isRecovery) {
-    return <ResetPasswordPage />;
-  }
+  if (isRecovery) return <ResetPasswordPage />;
 
   const isClientRoute = location.startsWith("/client/");
+  const isPublicTemplateRoute = location === "/templates" || location.startsWith("/templates/");
 
-  if (!user && !isClientRoute) {
-    return <AuthPage />;
-  }
+  if (!user && !isClientRoute && !isPublicTemplateRoute) return <AuthPage />;
 
   return (
     <Switch>
+      <Route path="/templates" component={TemplatesPage} />
+      <Route path="/templates/scope-of-work" component={ScopeOfWorkTemplatePage} />
+      <Route path="/templates/late-payment-invoice" component={LatePaymentTemplatePage} />
+      <Route path="/templates/client-brief-proposal" component={ClientBriefTemplatePage} />
       <Route path="/" component={Dashboard} />
       <Route path="/projects/:id" component={ProjectDetail} />
       <Route path="/client/:token" component={ClientPortal} />
