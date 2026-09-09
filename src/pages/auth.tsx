@@ -26,7 +26,9 @@ const descriptions: Record<Mode, string> = {
 };
 
 export default function AuthPage() {
-  const [mode, setMode] = useState<Mode>("login");
+  const [mode, setMode] = useState<Mode>(() =>
+    window.location.pathname === "/signup" ? "signup" : "login",
+  );
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
