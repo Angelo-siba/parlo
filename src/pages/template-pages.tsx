@@ -122,7 +122,7 @@ export function TemplateSiteHeader() {
         </Link>
         <nav className="flex items-center gap-4 text-sm" aria-label="Templates navigation">
           <Link href="/templates" className="hidden text-[#5B5149] transition hover:text-[#C84A1A] sm:block">Free templates</Link>
-          <a href="/" className="inline-flex items-center gap-2 rounded-full bg-[#C84A1A] px-4 py-2.5 font-semibold text-white transition hover:bg-[#A83D15]">Try Parlo for free <ArrowRight className="h-4 w-4" /></a>
+          <a href="/signup" className="inline-flex items-center gap-2 rounded-full bg-[#C84A1A] px-4 py-2.5 font-semibold text-white transition hover:bg-[#A83D15]">Try Parlo for free <ArrowRight className="h-4 w-4" /></a>
         </nav>
       </div>
     </header>
@@ -186,9 +186,8 @@ export function TemplateDetailPage({ template }: { template: TemplatePageData })
           </section>
 
           <section className="mt-20 rounded-2xl border border-[#C84A1A]/35 bg-white/65 p-7 sm:p-10">
-            <p className="max-w-2xl text-xl font-bold leading-tight text-[#1C1814] sm:text-2xl" style={{ fontFamily: "Georgia, serif" }}>Prefer to skip the paperwork?</p>
+            <p className="max-w-2xl text-xl font-bold leading-tight text-[#1C1814] sm:text-2xl" style={{ fontFamily: "Georgia, serif" }}>Want to manage client approvals automatically? <Link href="/signup" className="text-[#C84A1A] underline decoration-2 underline-offset-4 hover:text-[#A83D15]">Try Parlo free</Link></p>
             <p className="mt-3 max-w-2xl text-base leading-7 text-[#5B5149]">Parlo keeps scope, feedback, files, and invoices in one shareable client link.</p>
-            <a href="/" className="mt-6 inline-flex items-center gap-2 rounded-full border-2 border-[#C84A1A] px-5 py-3 text-sm font-bold text-[#C84A1A] transition hover:bg-[#C84A1A] hover:text-white">Try Parlo for free <ArrowRight className="h-4 w-4" /></a>
           </section>
         </div>
       </main>
