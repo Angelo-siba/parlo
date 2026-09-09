@@ -8,6 +8,7 @@ import ProjectDetail from "@/pages/project-detail";
 import ClientPortal from "@/pages/client-portal";
 import AuthPage from "@/pages/auth";
 import ResetPasswordPage from "@/pages/reset-password";
+import TemplatesPage from "@/pages/templates";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -29,13 +30,15 @@ function ProtectedRouter() {
   }
 
   const isClientRoute = location.startsWith("/client/");
+  const isPublicRoute = location === "/templates";
 
-  if (!user && !isClientRoute) {
+  if (!user && !isClientRoute && !isPublicRoute) {
     return <AuthPage />;
   }
 
   return (
     <Switch>
+      <Route path="/templates" component={TemplatesPage} />
       <Route path="/" component={Dashboard} />
       <Route path="/projects/:id" component={ProjectDetail} />
       <Route path="/client/:token" component={ClientPortal} />
