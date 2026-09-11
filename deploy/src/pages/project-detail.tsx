@@ -127,6 +127,9 @@ export default function ProjectDetail() {
   const [updateOpen, setUpdateOpen] = useState(false);
   const [updateSubject, setUpdateSubject] = useState("");
   const [updateBody, setUpdateBody] = useState("");
+  const [shareOpen, setShareOpen] = useState(false);
+  const [shareSubject, setShareSubject] = useState("");
+  const [shareBody, setShareBody] = useState("");
   const [handoffOpen, setHandoffOpen] = useState(false);
   const [handoffSubject, setHandoffSubject] = useState("");
   const [handoffBody, setHandoffBody] = useState("");
@@ -649,6 +652,30 @@ export default function ProjectDetail() {
     setUpdateOpen(true);
   }
 
+  function openShareLink() {
+    if (!project) return;
+    setShareSubject(`Your client portal for ${project.name}`);
+    setShareBody(
+      [
+        `Hey ${project.client_name},`,
+        "",
+        `I’ve included the link below to a portal where you can view the work, approve files, and leave feedback:`,
+        "",
+        shareUrl(),
+        "",
+        "No sign-in is needed — everything you need is in one place.",
+        "",
+        "Thanks!",
+      ].join("\n"),
+    );
+    setShareOpen(true);
+  }
+
+  function shareLinkMailto() {
+    if (!project) return "#";
+    return `mailto:${project.client_email}?subject=${encodeURIComponent(shareSubject)}&body=${encodeURIComponent(shareBody)}`;
+  }
+
   function updateMailtoLink() {
     if (!project) return "#";
     return `mailto:${project.client_email}?subject=${encodeURIComponent(updateSubject)}&body=${encodeURIComponent(updateBody)}`;
@@ -1126,6 +1153,44 @@ export default function ProjectDetail() {
               </Dialog>
             )}
 
+            <Dialog open={shareOpen} onOpenChange={setShareOpen}>
+              <DialogContent className="max-w-lg">
+                <DialogHeader>
+                  <DialogTitle>Share client portal</DialogTitle>
+                  <DialogDescription>
+                    A short note is ready with the portal link. Make any edits, then open it in your email app.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="share-link-subject">Subject</Label>
+                    <Input
+                      id="share-link-subject"
+                      value={shareSubject}
+                      onChange={(e) => setShareSubject(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="share-link-body">Message</Label>
+                    <Textarea
+                      id="share-link-body"
+                      value={shareBody}
+                      onChange={(e) => setShareBody(e.target.value)}
+                      rows={9}
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button asChild disabled={!shareSubject.trim() || !shareBody.trim()}>
+                    <a href={shareLinkMailto()}>
+                      <Mail className="h-4 w-4 mr-2" />
+                      Open email
+                    </a>
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
             <Dialog open={updateOpen} onOpenChange={setUpdateOpen}>
               <DialogTrigger asChild>
                 <Button
@@ -1296,7 +1361,7 @@ export default function ProjectDetail() {
               <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
                 <Button
                   size="sm"
-                  onClick={openClientUpdate}
+                  onClick={openShareLink}
                   data-testid="button-share-link"
                   className="w-full sm:w-auto"
                 >
