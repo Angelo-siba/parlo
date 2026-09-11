@@ -124,7 +124,6 @@ export default function ProjectDetail() {
   const [renameOpen, setRenameOpen] = useState(false);
   const [renameValue, setRenameValue] = useState("");
   const [renaming, setRenaming] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [updateOpen, setUpdateOpen] = useState(false);
   const [updateSubject, setUpdateSubject] = useState("");
   const [updateBody, setUpdateBody] = useState("");
@@ -609,13 +608,6 @@ export default function ProjectDetail() {
   function shareUrl() {
     if (!project) return "";
     return `${window.location.origin}${import.meta.env.BASE_URL}client/${project.share_token}`;
-  }
-
-  function copyLink() {
-    navigator.clipboard.writeText(shareUrl());
-    setCopied(true);
-    toast({ title: "Link copied" });
-    setTimeout(() => setCopied(false), 1800);
   }
 
   function openClientUpdate() {
@@ -1284,33 +1276,32 @@ export default function ProjectDetail() {
           </DialogContent>
         </Dialog>
 
-        <Card className="my-5 bg-primary/5 border-primary/30">
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between gap-3 flex-wrap">
+        <Card className="my-5 border-border bg-card shadow-sm">
+          <CardContent className="p-4 sm:p-5">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0 flex-1">
-                <div className="text-sm font-medium mb-1">
+                <div className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                   Client portal link
                 </div>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Share this link with your client to collect files and approvals.
+                </p>
                 <div
-                  className="text-xs text-muted-foreground truncate font-mono"
+                  className="mt-3 max-w-full truncate rounded-md bg-muted/50 px-3 py-2 text-xs font-mono text-foreground"
                   data-testid="text-share-url"
                 >
                   {shareUrl()}
                 </div>
               </div>
-              <div className="flex gap-2">
+              <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
                 <Button
                   size="sm"
-                  variant="outline"
-                  onClick={copyLink}
-                  data-testid="button-copy-link"
+                  onClick={openClientUpdate}
+                  data-testid="button-share-link"
+                  className="w-full sm:w-auto"
                 >
-                  {copied ? (
-                    <Check className="h-4 w-4 mr-2" />
-                  ) : (
-                    <Copy className="h-4 w-4 mr-2" />
-                  )}
-                  {copied ? "Copied" : "Copy link"}
+                  <Mail className="h-4 w-4 mr-2" />
+                  Share link
                 </Button>
                 <a
                   href={shareUrl()}
@@ -1318,9 +1309,9 @@ export default function ProjectDetail() {
                   rel="noopener noreferrer"
                   data-testid="link-open-portal"
                 >
-                  <Button size="sm" variant="outline">
+                  <Button size="sm" variant="outline" className="w-full sm:w-auto">
                     <ExternalLink className="h-4 w-4 mr-2" />
-                    Open
+                    Open portal
                   </Button>
                 </a>
               </div>
