@@ -11,6 +11,7 @@ import {
   Settings,
   Moon,
   Sun,
+  Search,
   DollarSign,
   TrendingUp,
   Hourglass,
@@ -71,6 +72,7 @@ export default function Dashboard() {
   const [name, setName] = useState("");
   const [clientName, setClientName] = useState("");
   const [clientEmail, setClientEmail] = useState("");
+  const [projectSearch, setProjectSearch] = useState("");
   const { toast } = useToast();
 
   // Revenue
@@ -354,6 +356,14 @@ export default function Dashboard() {
   const totalPending = projects.reduce((s, p) => s + p.pendingCount, 0);
   const totalApproved = projects.reduce((s, p) => s + p.approvedCount, 0);
   const hasRevenue = totalRevenue > 0 || outstanding > 0 || thisMonthRevenue > 0;
+  const normalizedProjectSearch = projectSearch.trim().toLowerCase();
+  const visibleProjects = normalizedProjectSearch
+    ? projects.filter(
+        (project) =>
+          project.name.toLowerCase().includes(normalizedProjectSearch) ||
+          project.client_name.toLowerCase().includes(normalizedProjectSearch),
+      )
+    : projects;
 
   return (
     <div className="min-h-screen bg-background">
@@ -371,6 +381,17 @@ export default function Dashboard() {
             </p>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
+            <div className="relative w-full sm:w-56">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={projectSearch}
+                onChange={(event) => setProjectSearch(event.target.value)}
+                placeholder="Search projects..."
+                aria-label="Search projects"
+                className="h-9 pl-9"
+                data-testid="input-project-search"
+              />
+            </div>
             <Button
               variant="outline"
               size="sm"
@@ -644,9 +665,26 @@ export default function Dashboard() {
               </Button>
             </CardContent>
           </Card>
+        ) : visibleProjects.length === 0 ? (
+          <Card className="border-dashed">
+            <CardContent className="py-12 text-center">
+              <Search className="h-8 w-8 mx-auto text-muted-foreground mb-3" />
+              <h3 className="text-lg font-medium">No matching projects</h3>
+              <p className="text-muted-foreground mb-4">
+                Try a different project or client name.
+              </p>
+              <Button
+                variant="outline"
+                onClick={() => setProjectSearch("")}
+                data-testid="button-clear-project-search"
+              >
+                Clear search
+              </Button>
+            </CardContent>
+          </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {projects.map((p) => (
+            {visibleProjects.map((p) => (
               <Link
                 key={p.id}
                 href={`/projects/${p.id}`}
