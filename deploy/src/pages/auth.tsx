@@ -27,7 +27,7 @@ const FEATURES = [
 
 export default function AuthPage() {
   const [mode, setMode] = useState<Mode>(() =>
-    new URLSearchParams(window.location.search).get("mode") === "signup"
+    new URLSearchParams(window.location.search).get("mode") === "signup" || window.location.pathname === "/signup"
       ? "signup"
       : "login",
   );
