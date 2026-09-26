@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +33,7 @@ export default function AuthPage() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState<"signup" | "forgot" | null>(null);
+  const [, setLocation] = useLocation();
   const { signIn, signUp, resetPassword } = useAuth();
 
   function switchMode(next: Mode) {
@@ -48,9 +50,11 @@ export default function AuthPage() {
     if (mode === "login") {
       const { error: err } = await signIn(email, password);
       if (err) setError(err);
+      else setLocation("/");
     } else if (mode === "signup") {
-      const { error: err } = await signUp(email, password);
+      const { error: err, session } = await signUp(email, password);
       if (err) setError(err);
+      else if (session) setLocation("/");
       else setDone("signup");
     } else {
       const { error: err } = await resetPassword(email);
