@@ -1,4 +1,4 @@
-import { ArrowRight, ArrowUpRight, Camera, Check, CheckCircle2, Clock3, FileCheck2, FolderKanban, Palette, Receipt, Sparkles, Video, Zap } from "lucide-react";
+import { ArrowRight, ArrowUpRight, Camera, Check, CheckCircle2, Clock3, Download, FileCheck2, FolderKanban, Palette, Receipt, Sparkles, Video, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const orange = "#d4521a";
@@ -95,6 +95,57 @@ function FeatureIcon({ icon: Icon }: { icon: React.ComponentType<{ className?: s
   return <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#fff0e9] text-[#d4521a]"><Icon className="h-5 w-5" /></div>;
 }
 
+const TEMPLATE_RESOURCES = [
+  {
+    eyebrow: "Proposal",
+    title: "Client brief & proposal",
+    description: "Turn a discovery call into a clear, professional starting point.",
+    file: "parlo-client-brief-proposal-template.docx",
+    sections: ["Project snapshot", "Goals, scope & timeline", "Investment and next steps"],
+    icon: FileCheck2,
+  },
+  {
+    eyebrow: "Scope",
+    title: "Scope of work",
+    description: "Make deliverables, revisions, and boundaries impossible to misremember.",
+    file: "parlo-scope-of-work-template.docx",
+    sections: ["Deliverables & revisions", "What's out of scope", "Timeline and change requests"],
+    icon: FolderKanban,
+  },
+  {
+    eyebrow: "Payments",
+    title: "Late-payment invoice terms",
+    description: "Set payment expectations before chasing money becomes part of the job.",
+    file: "parlo-late-payment-invoice-template.docx",
+    sections: ["Itemized charges", "Late payment policy", "Reminder and notice steps"],
+    icon: Receipt,
+  },
+];
+
+function TemplateCard({ resource }: { resource: (typeof TEMPLATE_RESOURCES)[number] }) {
+  const Icon = resource.icon;
+
+  return (
+    <article className="flex h-full flex-col rounded-2xl border border-[#e4d7cc] bg-[#fffdfa] p-6 shadow-[0_12px_32px_rgba(68,42,25,0.06)] transition-transform hover:-translate-y-1 sm:p-7">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#fff0e9] text-[#d4521a]"><Icon className="h-5 w-5" /></div>
+        <span className="rounded-full bg-[#f5f0e8] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8b776a]">{resource.eyebrow}</span>
+      </div>
+      <h3 className="mt-6 text-xl font-semibold tracking-[-0.025em] text-[#2c211b]">{resource.title}</h3>
+      <p className="mt-3 min-h-[3.5rem] text-sm leading-6 text-[#75665d]">{resource.description}</p>
+      <div className="mt-6 flex-1 border-t border-[#eee4da] pt-5">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#a39287]">Inside the template</p>
+        <ul className="mt-3 space-y-2.5 text-sm text-[#5f5148]">
+          {resource.sections.map((section) => (
+            <li key={section} className="flex items-start gap-2"><Check className="mt-0.5 h-4 w-4 flex-shrink-0 text-[#d4521a]" />{section}</li>
+          ))}
+        </ul>
+      </div>
+      <a href={`/templates/${resource.file}`} download className="mt-7 inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-[#d8c5b8] px-4 text-sm font-semibold text-[#b44819] transition-colors hover:bg-[#fff0e9]">Download .DOCX <Download className="h-4 w-4" /></a>
+    </article>
+  );
+}
+
 export default function LandingPage() {
   return (
     <div className="min-h-screen overflow-x-hidden bg-[#f5f0e8] text-[#2c211b]">
@@ -118,7 +169,24 @@ export default function LandingPage() {
 
         <section id="features" className="mx-auto max-w-7xl px-5 py-24 sm:px-8 lg:px-10 lg:py-32"><div className="mx-auto max-w-2xl text-center"><p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#d4521a]">Less admin, more making</p><h2 className="mt-4 text-4xl font-semibold tracking-[-0.04em] text-[#2c211b] sm:text-5xl">Everything your client needs.<br />Nothing they don't.</h2><p className="mt-5 text-lg leading-8 text-[#75675e]">A polished workflow for the parts of freelance work that usually get messy.</p></div><div className="mt-14 grid gap-6 lg:grid-cols-3">{features.map(({ icon, title, description, mockup }) => <article key={title} className="group rounded-2xl border border-[#e3d5c9] bg-[#fbf7f1] p-4 transition-transform hover:-translate-y-1 sm:p-5"><div className="mb-5 px-1"><FeatureIcon icon={icon} /><h3 className="mt-4 text-xl font-semibold tracking-[-0.025em] text-[#2c211b]">{title}</h3><p className="mt-2 text-sm leading-6 text-[#78695f]">{description}</p></div><div className="overflow-hidden rounded-xl">{mockup}</div></article>)}</div></section>
 
-        <section id="comparison" className="bg-[#2c211b] px-5 py-24 text-white sm:px-8 lg:px-10 lg:py-28"><div className="mx-auto grid max-w-6xl gap-12 lg:grid-cols-[0.75fr_1.25fr] lg:items-center"><div><p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#ed9a70]">Built for solo work</p><h2 className="mt-4 text-4xl font-semibold tracking-[-0.04em] sm:text-5xl">The professional client experience—without the enterprise bill.</h2><p className="mt-5 max-w-md text-base leading-7 text-white/60">Parlo gives you the pieces that matter when you work alone, without making you spend hours learning a system built for a 50-person agency.</p><Button asChild className="mt-8 bg-[#d4521a] text-white hover:bg-[#b94615]"><a href="/signup">Try Parlo free <ArrowRight className="ml-2 h-4 w-4" /></a></Button></div><div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.06]"><table className="w-full border-collapse text-left text-sm"><thead><tr className="border-b border-white/10"><th className="px-4 py-4 font-medium text-white/50 sm:px-6"> </th><th className="bg-[#d4521a] px-4 py-4 font-semibold text-white sm:px-6">Parlo</th><th className="px-4 py-4 font-medium text-white/50 sm:px-6">Kitchen.co</th></tr></thead><tbody>{[["Price", "$9/month", "$29/month"],["Client login needed", "No", "Yes"],["Setup time", "2 minutes", "Hours"],["Built for solo freelancers", "Yes", "No"]].map(([label, parlo, kitchen]) => <tr key={label} className="border-b border-white/10 last:border-0"><th className="px-4 py-5 font-medium text-white/70 sm:px-6">{label}</th><td className="bg-[#d4521a]/10 px-4 py-5 font-semibold text-white sm:px-6">{parlo === "Yes" ? <span className="flex items-center gap-2"><Check className="h-4 w-4 text-[#ed9a70]" /> Yes</span> : parlo}</td><td className="px-4 py-5 text-white/55 sm:px-6">{kitchen === "No" ? <span className="text-white/35">✕ No</span> : kitchen}</td></tr>)}</tbody></table></div></div></section>
+        
+         <section id="templates" className="border-y border-[#e2d5c9] bg-[#faf5ef] px-5 py-24 sm:px-8 lg:px-10 lg:py-28">
+           <div className="mx-auto max-w-7xl">
+             <div className="max-w-2xl">
+               <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#d4521a]">Free resources</p>
+               <h2 className="mt-4 text-4xl font-semibold leading-tight tracking-[-0.04em] text-[#2c211b] sm:text-5xl">The paperwork that makes you look established.</h2>
+               <p className="mt-5 max-w-xl text-lg leading-8 text-[#75665d]">Start with the same documents we built for freelancers who want clearer projects, firmer boundaries, and fewer awkward follow-ups. No account required.</p>
+             </div>
+             <div className="mt-12 grid gap-5 lg:grid-cols-3">
+               {TEMPLATE_RESOURCES.map((resource) => <TemplateCard key={resource.file} resource={resource} />)}
+             </div>
+             <div className="mt-8 flex flex-col items-start justify-between gap-4 rounded-xl border border-[#e4d7cc] bg-[#fffdfa] px-5 py-4 text-sm sm:flex-row sm:items-center sm:px-6">
+               <p className="text-[#75665d]">Download the templates free. Use Parlo when you’re ready to keep the whole project in one place.</p>
+               <a href="/signup" className="inline-flex flex-shrink-0 items-center gap-2 font-semibold text-[#b44819] hover:text-[#8f3714]">Try Parlo free <ArrowRight className="h-4 w-4" /></a>
+             </div>
+           </div>
+         </section>
+         <section id="comparison" className="bg-[#2c211b] px-5 py-24 text-white sm:px-8 lg:px-10 lg:py-28"><div className="mx-auto grid max-w-6xl gap-12 lg:grid-cols-[0.75fr_1.25fr] lg:items-center"><div><p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#ed9a70]">Built for solo work</p><h2 className="mt-4 text-4xl font-semibold tracking-[-0.04em] sm:text-5xl">The professional client experience—without the enterprise bill.</h2><p className="mt-5 max-w-md text-base leading-7 text-white/60">Parlo gives you the pieces that matter when you work alone, without making you spend hours learning a system built for a 50-person agency.</p><Button asChild className="mt-8 bg-[#d4521a] text-white hover:bg-[#b94615]"><a href="/signup">Try Parlo free <ArrowRight className="ml-2 h-4 w-4" /></a></Button></div><div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.06]"><table className="w-full border-collapse text-left text-sm"><thead><tr className="border-b border-white/10"><th className="px-4 py-4 font-medium text-white/50 sm:px-6"> </th><th className="bg-[#d4521a] px-4 py-4 font-semibold text-white sm:px-6">Parlo</th><th className="px-4 py-4 font-medium text-white/50 sm:px-6">Kitchen.co</th></tr></thead><tbody>{[["Price", "$9/month", "$29/month"],["Client login needed", "No", "Yes"],["Setup time", "2 minutes", "Hours"],["Built for solo freelancers", "Yes", "No"]].map(([label, parlo, kitchen]) => <tr key={label} className="border-b border-white/10 last:border-0"><th className="px-4 py-5 font-medium text-white/70 sm:px-6">{label}</th><td className="bg-[#d4521a]/10 px-4 py-5 font-semibold text-white sm:px-6">{parlo === "Yes" ? <span className="flex items-center gap-2"><Check className="h-4 w-4 text-[#ed9a70]" /> Yes</span> : parlo}</td><td className="px-4 py-5 text-white/55 sm:px-6">{kitchen === "No" ? <span className="text-white/35">✕ No</span> : kitchen}</td></tr>)}</tbody></table></div></div></section>
 
         <section className="mx-auto max-w-7xl px-5 py-24 sm:px-8 lg:px-10 lg:py-32"><div className="relative overflow-hidden rounded-[2rem] bg-[#d4521a] px-7 py-16 text-center text-white shadow-[0_24px_70px_rgba(212,82,26,0.22)] sm:px-12"><div className="pointer-events-none absolute -left-16 -top-24 h-64 w-64 rounded-full border-[32px] border-white/10" /><div className="pointer-events-none absolute -bottom-40 -right-10 h-80 w-80 rounded-full border-[40px] border-white/10" /><div className="relative"><Zap className="mx-auto h-7 w-7 text-[#ffd1bc]" /><h2 className="mt-5 text-4xl font-semibold tracking-[-0.04em] sm:text-5xl">Ready to stop chasing clients?</h2><p className="mx-auto mt-4 max-w-xl text-base leading-7 text-white/80">Give your work a home that makes clients feel looked after—and gives you your time back.</p><Button asChild size="lg" className="mt-8 h-13 bg-white px-7 text-base font-semibold text-[#b94615] shadow-none hover:bg-[#fff4ed]"><a href="/signup">Start Free Today <ArrowRight className="ml-2 h-4 w-4" /></a></Button></div></div></section>
       </main>
