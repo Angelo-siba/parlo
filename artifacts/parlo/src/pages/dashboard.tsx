@@ -9,6 +9,8 @@ import {
   CheckCircle2,
   AlertCircle,
   Settings,
+  Moon,
+  Sun,
   DollarSign,
   TrendingUp,
   Hourglass,
@@ -42,6 +44,8 @@ import {
   loadAllProjectFiles,
 } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
+import { useTheme } from "next-themes";
+import { Switch } from "@/components/ui/switch";
 
 type ProjectWithStats = Project & {
   fileCount: number;
@@ -59,6 +63,7 @@ const DEFAULT_ACCENT = "#d4521a";
 
 export default function Dashboard() {
   const { user, signOut } = useAuth();
+  const { resolvedTheme, setTheme } = useTheme();
   const [projects, setProjects] = useState<ProjectWithStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -373,7 +378,7 @@ export default function Dashboard() {
               data-testid="button-settings"
             >
               <Settings className="h-4 w-4 mr-2" />
-              Brand settings
+              Settings
             </Button>
             <Dialog open={open} onOpenChange={setOpen}>
               <DialogTrigger asChild>
@@ -443,12 +448,40 @@ export default function Dashboard() {
         <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Brand settings</DialogTitle>
+              <DialogTitle>Settings</DialogTitle>
               <DialogDescription>
                 Your logo and accent color appear on client portals.
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSaveSettings} className="space-y-5">
+              <div className="flex items-center justify-between gap-4 rounded-lg border border-border/60 bg-muted/20 p-3.5">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 rounded-md bg-background p-2 text-muted-foreground">
+                    {resolvedTheme === "dark" ? (
+                      <Moon className="h-4 w-4" />
+                    ) : (
+                      <Sun className="h-4 w-4" />
+                    )}
+                  </div>
+                  <div>
+                    <Label htmlFor="theme-toggle" className="text-sm font-medium">
+                      Dark mode
+                    </Label>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Use a darker color scheme across Parlo.
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  id="theme-toggle"
+                  checked={resolvedTheme === "dark"}
+                  onCheckedChange={(checked) =>
+                    setTheme(checked ? "dark" : "light")
+                  }
+                  aria-label="Toggle dark mode"
+                />
+              </div>
+
               {/* Logo */}
               <div className="space-y-2">
                 <Label>Your logo</Label>
