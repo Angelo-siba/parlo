@@ -4,6 +4,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import Dashboard from "@/pages/dashboard";
+import LandingPage from "@/pages/landing";
+import PricingPage from "@/pages/pricing";
 import ProjectDetail from "@/pages/project-detail";
 import ClientPortal from "@/pages/client-portal";
 import AuthPage from "@/pages/auth";
@@ -28,13 +30,27 @@ function ProtectedRouter() {
   }
 
   const isClientRoute = location.startsWith("/client/");
-  if (!user && !isClientRoute) {
+  const isPublicRoute = location === "/" || location === "/pricing" || location === "/signup" || location === "/login";
+
+  if (!user && location === "/") {
+    return <LandingPage />;
+  }
+  if (!user && location === "/pricing") {
+    return <PricingPage />;
+  }
+  if (!user && (location === "/signup" || location === "/login")) {
+    return <AuthPage />;
+  }
+  if (!user && !isClientRoute && !isPublicRoute) {
     return <AuthPage />;
   }
 
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
+      <Route path="/pricing" component={PricingPage} />
+      <Route path="/signup" component={AuthPage} />
+      <Route path="/login" component={AuthPage} />
       <Route path="/projects/:id" component={ProjectDetail} />
       <Route path="/client/:token" component={ClientPortal} />
       <Route component={NotFound} />
