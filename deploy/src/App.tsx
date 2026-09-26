@@ -1,4 +1,4 @@
-import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
+import { Redirect, Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -30,6 +30,11 @@ function ProtectedRouter() {
   }
 
   const isClientRoute = location.startsWith("/client/");
+
+  if (user && (location === "/signup" || location === "/login")) {
+    return <Redirect to="/" />;
+  }
+
   const isPublicRoute = location === "/" || location === "/pricing" || location === "/signup" || location === "/login";
 
   if (!user && location === "/") {
