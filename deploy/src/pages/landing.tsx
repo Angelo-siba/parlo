@@ -19,6 +19,7 @@ function PublicHeader() {
       <nav className="hidden items-center gap-8 text-sm font-medium text-[#6e625a] md:flex">
         <a href="#features" className="transition-colors hover:text-[#2c211b]">Features</a>
         <a href="#comparison" className="transition-colors hover:text-[#2c211b]">Why Parlo</a>
+        <a href="#templates" className="transition-colors hover:text-[#2c211b]">Free resources</a>
         <a href="/pricing" className="transition-colors hover:text-[#2c211b]">Pricing</a>
       </nav>
       <div className="flex items-center gap-2 sm:gap-3">
