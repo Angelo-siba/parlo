@@ -15,6 +15,7 @@ type AuthContextType = {
   isRecovery: boolean;
   signUp: (email: string, password: string) => Promise<{ error: string | null; session: boolean }>;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
+  updatePreferredName: (name: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: string | null }>;
   updatePassword: (newPassword: string) => Promise<{ error: string | null }>;
@@ -58,6 +59,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: error?.message ?? null };
   }
 
+  async function updatePreferredName(name: string) {
+    const { data, error } = await supabase.auth.updateUser({
+      data: { preferred_name: name.trim() || null },
+    });
+    if (!error && data.user) setUser(data.user);
+    return { error: error?.message ?? null };
+  }
+
   async function signOut() {
     await supabase.auth.signOut();
   }
@@ -85,6 +94,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isRecovery,
         signUp,
         signIn,
+        updatePreferredName,
         signOut,
         resetPassword,
         updatePassword,

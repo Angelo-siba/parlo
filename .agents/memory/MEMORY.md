@@ -1,2 +1,3 @@
 - [Supabase logo storage RLS](supabase-logo-storage-rls.md) — managed storage tables reject owner-only SQL; unique non-overwrite uploads avoid extra RLS checks.
 - [GitHub push authentication](github-push-auth.md) — when bearer auth is rejected, GitHub accepts the token via a basic x-access-token header.
+- [Freelancer greeting name](freelancer-greeting-name.md) — keep the personal dashboard name separate from client-facing branding and persist it in Supabase Auth metadata.

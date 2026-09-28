@@ -71,7 +71,7 @@ function generateShareToken() {
 const DEFAULT_ACCENT = "#d4521a";
 
 export default function Dashboard() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, updatePreferredName } = useAuth();
   const { resolvedTheme, setTheme } = useTheme();
   const [isPro, setIsPro] = useState(() => isProUser(user));
   const [billingLoading, setBillingLoading] = useState(Boolean(user));
@@ -100,6 +100,11 @@ export default function Dashboard() {
   const [accentColor, setAccentColor] = useState(DEFAULT_ACCENT);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [preferredName, setPreferredName] = useState("");
+  const [namePromptValue, setNamePromptValue] = useState("");
+  const [namePromptOpen, setNamePromptOpen] = useState(false);
+  const [savingPreferredName, setSavingPreferredName] = useState(false);
+  const hasPromptedForName = useRef(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
 
   async function loadProjects() {
@@ -237,11 +242,45 @@ export default function Dashboard() {
   }
 
   useEffect(() => {
+    const nameFromMetadata =
+      typeof user?.user_metadata?.preferred_name === "string"
+        ? user.user_metadata.preferred_name.trim()
+        : "";
+
+    setPreferredName(nameFromMetadata);
+    setNamePromptValue(nameFromMetadata);
+    if (user && !nameFromMetadata && !hasPromptedForName.current) {
+      hasPromptedForName.current = true;
+      setNamePromptOpen(true);
+    }
+
     loadProjects();
     loadSubscription();
     loadSettings();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
+
+  async function handleSavePreferredName(e: React.FormEvent) {
+    e.preventDefault();
+    const nextName = namePromptValue.trim();
+    if (!nextName) return;
+
+    setSavingPreferredName(true);
+    const { error } = await updatePreferredName(nextName);
+    setSavingPreferredName(false);
+
+    if (error) {
+      toast({
+        title: "Couldn't save your name",
+        description: error,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setPreferredName(nextName);
+    setNamePromptOpen(false);
+  }
 
   useEffect(() => {
     const refreshSubscription = () => {
@@ -452,6 +491,26 @@ export default function Dashboard() {
           project.client_name.toLowerCase().includes(normalizedProjectSearch),
       )
     : projects;
+  const projectGroups = [
+    {
+      status: "active" as const,
+      label: "Active",
+      projects: visibleProjects.filter((project) => project.status === "active"),
+    },
+    {
+      status: "draft" as const,
+      label: "Draft",
+      projects: visibleProjects.filter((project) => project.status === "draft"),
+    },
+    {
+      status: "completed" as const,
+      label: "Completed",
+      projects: visibleProjects.filter(
+        (project) =>
+          project.status === "completed" || project.status === "archived",
+      ),
+    },
+  ].filter((group) => group.projects.length > 0);
 
   return (
     <div className="min-h-screen bg-background">
@@ -482,7 +541,7 @@ export default function Dashboard() {
                 )}
               </div>
               <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">
-                Your projects
+                {preferredName ? `Welcome back, ${preferredName}` : "Welcome to Parlo"}
               </h1>
               <p className="text-muted-foreground mt-1.5 max-w-xl">
                 Keep client work moving, share approvals, and see what needs your attention.
@@ -582,6 +641,48 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+
+        <Dialog open={namePromptOpen} onOpenChange={setNamePromptOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>What should we call you?</DialogTitle>
+              <DialogDescription>
+                We’ll use this name to personalize your Parlo dashboard.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleSavePreferredName} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="preferredName">Your name</Label>
+                <Input
+                  id="preferredName"
+                  value={namePromptValue}
+                  onChange={(e) => setNamePromptValue(e.target.value)}
+                  placeholder="e.g. Alex"
+                  autoFocus
+                  required
+                  maxLength={80}
+                  data-testid="input-preferred-name"
+                />
+              </div>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setNamePromptOpen(false)}
+                >
+                  Not now
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={savingPreferredName || !namePromptValue.trim()}
+                  data-testid="button-save-preferred-name"
+                >
+                  {savingPreferredName ? "Saving..." : "Save name"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
 
         {/* Free plan project limit dialog */}
         <Dialog open={limitDialogOpen} onOpenChange={setLimitDialogOpen}>
@@ -883,51 +984,61 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {visibleProjects.map((p) => (
-              <Link
-                key={p.id}
-                href={"/projects/" + p.id}
-                data-testid={"link-project-" + p.id}
-              >
-                <Card className="hover-elevate cursor-pointer h-full transition-colors hover:border-primary/30">
-                  <CardHeader>
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2 flex-wrap min-w-0">
-                        <CardTitle className="text-lg">{p.name}</CardTitle>
-                        <StatusBadge status={p.status} />
-                      </div>
-                      {p.pendingCount > 0 ? (
-                        <Badge
-                          variant="secondary"
-                          className="bg-primary/10 text-primary border-primary/20 shrink-0"
-                        >
-                          {p.pendingCount} pending
-                        </Badge>
-                      ) : p.fileCount > 0 ? (
-                        <Badge variant="outline" className="shrink-0">All approved</Badge>
-                      ) : (
-                        <Badge variant="outline" className="shrink-0">No files</Badge>
-                      )}
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-2 text-sm">
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Mail className="h-3.5 w-3.5" />
-                      {p.client_name} · {p.client_email}
-                    </div>
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Clock className="h-3.5 w-3.5" />
-                      Created{" "}
-                      {format(new Date(p.created_at), "MMM d, yyyy")}
-                    </div>
-                    <div className="mt-4 flex items-center justify-between border-t border-border/60 pt-3 text-sm">
-                      <span className="font-medium text-foreground">Open project</span>
-                      <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
+          <div className="space-y-8">
+            {projectGroups.map((group) => (
+              <section key={group.status}>
+                <div className="flex items-center gap-2 mb-3">
+                  <h2 className="text-sm font-semibold">{group.label}</h2>
+                  <Badge variant="secondary">{group.projects.length}</Badge>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {group.projects.map((p) => (
+                    <Link
+                      key={p.id}
+                      href={"/projects/" + p.id}
+                      data-testid={"link-project-" + p.id}
+                    >
+                      <Card className="hover-elevate cursor-pointer h-full transition-colors hover:border-primary/30">
+                        <CardHeader>
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-2 flex-wrap min-w-0">
+                              <CardTitle className="text-lg">{p.name}</CardTitle>
+                              <StatusBadge status={p.status} />
+                            </div>
+                            {p.pendingCount > 0 ? (
+                              <Badge
+                                variant="secondary"
+                                className="bg-primary/10 text-primary border-primary/20 shrink-0"
+                              >
+                                {p.pendingCount} pending
+                              </Badge>
+                            ) : p.fileCount > 0 ? (
+                              <Badge variant="outline" className="shrink-0">All approved</Badge>
+                            ) : (
+                              <Badge variant="outline" className="shrink-0">No files</Badge>
+                            )}
+                          </div>
+                        </CardHeader>
+                        <CardContent className="space-y-2 text-sm">
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <Mail className="h-3.5 w-3.5" />
+                            {p.client_name} · {p.client_email}
+                          </div>
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <Clock className="h-3.5 w-3.5" />
+                            Created{" "}
+                            {format(new Date(p.created_at), "MMM d, yyyy")}
+                          </div>
+                          <div className="mt-4 flex items-center justify-between border-t border-border/60 pt-3 text-sm">
+                            <span className="font-medium text-foreground">Open project</span>
+                            <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </Link>
+                  ))}
+                </div>
+              </section>
             ))}
           </div>
         )}

@@ -63,7 +63,7 @@ function generateShareToken() {
 const DEFAULT_ACCENT = "#d4521a";
 
 export default function Dashboard() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, updatePreferredName } = useAuth();
   const { resolvedTheme, setTheme } = useTheme();
   const [projects, setProjects] = useState<ProjectWithStats[]>([]);
   const [loading, setLoading] = useState(true);
@@ -88,6 +88,11 @@ export default function Dashboard() {
   const [accentColor, setAccentColor] = useState(DEFAULT_ACCENT);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [preferredName, setPreferredName] = useState("");
+  const [namePromptValue, setNamePromptValue] = useState("");
+  const [namePromptOpen, setNamePromptOpen] = useState(false);
+  const [savingPreferredName, setSavingPreferredName] = useState(false);
+  const hasPromptedForName = useRef(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
 
   async function loadProjects() {
@@ -202,10 +207,44 @@ export default function Dashboard() {
   }
 
   useEffect(() => {
+    const nameFromMetadata =
+      typeof user?.user_metadata?.preferred_name === "string"
+        ? user.user_metadata.preferred_name.trim()
+        : "";
+
+    setPreferredName(nameFromMetadata);
+    setNamePromptValue(nameFromMetadata);
+    if (user && !nameFromMetadata && !hasPromptedForName.current) {
+      hasPromptedForName.current = true;
+      setNamePromptOpen(true);
+    }
+
     loadProjects();
     loadSettings();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
+
+  async function handleSavePreferredName(e: React.FormEvent) {
+    e.preventDefault();
+    const nextName = namePromptValue.trim();
+    if (!nextName) return;
+
+    setSavingPreferredName(true);
+    const { error } = await updatePreferredName(nextName);
+    setSavingPreferredName(false);
+
+    if (error) {
+      toast({
+        title: "Couldn't save your name",
+        description: error,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setPreferredName(nextName);
+    setNamePromptOpen(false);
+  }
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -364,6 +403,26 @@ export default function Dashboard() {
           project.client_name.toLowerCase().includes(normalizedProjectSearch),
       )
     : projects;
+  const projectGroups = [
+    {
+      status: "active" as const,
+      label: "Active",
+      projects: visibleProjects.filter((project) => project.status === "active"),
+    },
+    {
+      status: "draft" as const,
+      label: "Draft",
+      projects: visibleProjects.filter((project) => project.status === "draft"),
+    },
+    {
+      status: "completed" as const,
+      label: "Completed",
+      projects: visibleProjects.filter(
+        (project) =>
+          project.status === "completed" || project.status === "archived",
+      ),
+    },
+  ].filter((group) => group.projects.length > 0);
 
   return (
     <div className="min-h-screen bg-background">
@@ -375,7 +434,9 @@ export default function Dashboard() {
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <div className="flex items-start justify-between mb-6 flex-wrap gap-3">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">Projects</h1>
+            <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">
+              {preferredName ? `Welcome back, ${preferredName}` : "Welcome to Parlo"}
+            </h1>
             <p className="text-muted-foreground mt-1">
               Manage client work and review approvals.
             </p>
@@ -464,6 +525,48 @@ export default function Dashboard() {
             </Dialog>
           </div>
         </div>
+
+        <Dialog open={namePromptOpen} onOpenChange={setNamePromptOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>What should we call you?</DialogTitle>
+              <DialogDescription>
+                We’ll use this name to personalize your Parlo dashboard.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleSavePreferredName} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="preferredName">Your name</Label>
+                <Input
+                  id="preferredName"
+                  value={namePromptValue}
+                  onChange={(e) => setNamePromptValue(e.target.value)}
+                  placeholder="e.g. Alex"
+                  autoFocus
+                  required
+                  maxLength={80}
+                  data-testid="input-preferred-name"
+                />
+              </div>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setNamePromptOpen(false)}
+                >
+                  Not now
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={savingPreferredName || !namePromptValue.trim()}
+                  data-testid="button-save-preferred-name"
+                >
+                  {savingPreferredName ? "Saving..." : "Save name"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
 
         {/* Brand settings dialog */}
         <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
@@ -623,7 +726,7 @@ export default function Dashboard() {
           <StatCard
             icon={<FolderOpen className="h-5 w-5" />}
             label="Active projects"
-            value={projects.length}
+            value={projects.filter((project) => project.status === "active").length}
           />
           <StatCard
             icon={<Clock className="h-5 w-5" />}
@@ -683,47 +786,57 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {visibleProjects.map((p) => (
-              <Link
-                key={p.id}
-                href={`/projects/${p.id}`}
-                data-testid={`link-project-${p.id}`}
-              >
-                <Card className="hover-elevate cursor-pointer h-full">
-                  <CardHeader>
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2 flex-wrap min-w-0">
-                        <CardTitle className="text-lg">{p.name}</CardTitle>
-                        <StatusBadge status={p.status} />
-                      </div>
-                      {p.pendingCount > 0 ? (
-                        <Badge
-                          variant="secondary"
-                          className="bg-primary/10 text-primary border-primary/20 shrink-0"
-                        >
-                          {p.pendingCount} pending
-                        </Badge>
-                      ) : p.fileCount > 0 ? (
-                        <Badge variant="outline" className="shrink-0">All approved</Badge>
-                      ) : (
-                        <Badge variant="outline" className="shrink-0">No files</Badge>
-                      )}
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-2 text-sm">
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Mail className="h-3.5 w-3.5" />
-                      {p.client_name} · {p.client_email}
-                    </div>
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Clock className="h-3.5 w-3.5" />
-                      Created{" "}
-                      {format(new Date(p.created_at), "MMM d, yyyy")}
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
+          <div className="space-y-8">
+            {projectGroups.map((group) => (
+              <section key={group.status}>
+                <div className="flex items-center gap-2 mb-3">
+                  <h2 className="text-sm font-semibold">{group.label}</h2>
+                  <Badge variant="secondary">{group.projects.length}</Badge>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {group.projects.map((p) => (
+                    <Link
+                      key={p.id}
+                      href={`/projects/${p.id}`}
+                      data-testid={`link-project-${p.id}`}
+                    >
+                      <Card className="hover-elevate cursor-pointer h-full">
+                        <CardHeader>
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-center gap-2 flex-wrap min-w-0">
+                              <CardTitle className="text-lg">{p.name}</CardTitle>
+                              <StatusBadge status={p.status} />
+                            </div>
+                            {p.pendingCount > 0 ? (
+                              <Badge
+                                variant="secondary"
+                                className="bg-primary/10 text-primary border-primary/20 shrink-0"
+                              >
+                                {p.pendingCount} pending
+                              </Badge>
+                            ) : p.fileCount > 0 ? (
+                              <Badge variant="outline" className="shrink-0">All approved</Badge>
+                            ) : (
+                              <Badge variant="outline" className="shrink-0">No files</Badge>
+                            )}
+                          </div>
+                        </CardHeader>
+                        <CardContent className="space-y-2 text-sm">
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <Mail className="h-3.5 w-3.5" />
+                            {p.client_name} · {p.client_email}
+                          </div>
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <Clock className="h-3.5 w-3.5" />
+                            Created{" "}
+                            {format(new Date(p.created_at), "MMM d, yyyy")}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </Link>
+                  ))}
+                </div>
+              </section>
             ))}
           </div>
         )}
