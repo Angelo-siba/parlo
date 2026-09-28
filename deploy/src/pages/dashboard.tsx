@@ -70,6 +70,34 @@ function generateShareToken() {
 
 const DEFAULT_ACCENT = "#d4521a";
 
+function getDashboardGreeting(name: string) {
+  const hour = new Date().getHours();
+  const timeGreeting =
+    hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  return name ? `${timeGreeting}, ${name}` : "Welcome to Parlo";
+}
+
+function getWorkspaceMessage(
+  loading: boolean,
+  projectCount: number,
+  activeProjectCount: number,
+  pendingCount: number,
+) {
+  if (loading) return "Loading your workspace...";
+  if (pendingCount > 0) {
+    return `You have ${pendingCount} file${pendingCount === 1 ? "" : "s"} waiting for client approval.`;
+  }
+  if (activeProjectCount > 0) {
+    return `${activeProjectCount} active project${activeProjectCount === 1 ? "" : "s"} ${
+      activeProjectCount === 1 ? "is" : "are"
+    } moving forward.`;
+  }
+  if (projectCount > 0) {
+    return "Your workspace is clear. Start a new project when you’re ready.";
+  }
+  return "Let’s set up your first project.";
+}
+
 export default function Dashboard() {
   const { user, signOut, updatePreferredName } = useAuth();
   const { resolvedTheme, setTheme } = useTheme();
@@ -413,6 +441,26 @@ export default function Dashboard() {
       userId,
       hasAccessToken: Boolean(session.access_token),
     });
+
+    const nextPreferredName = preferredName.trim();
+    const currentPreferredName =
+      typeof authenticatedUser.user_metadata?.preferred_name === "string"
+        ? authenticatedUser.user_metadata.preferred_name.trim()
+        : "";
+    if (nextPreferredName !== currentPreferredName) {
+      const { error: preferredNameError } =
+        await updatePreferredName(nextPreferredName);
+      if (preferredNameError) {
+        toast({
+          title: "Couldn't save your name",
+          description: preferredNameError,
+          variant: "destructive",
+        });
+        setSavingSettings(false);
+        return;
+      }
+    }
+
     let logoUrl = settings?.logo_url ?? null;
 
     if (logoFile) {
@@ -511,11 +559,18 @@ export default function Dashboard() {
       ),
     },
   ].filter((group) => group.projects.length > 0);
+  const dashboardGreeting = getDashboardGreeting(preferredName);
+  const workspaceMessage = getWorkspaceMessage(
+    loading,
+    projects.length,
+    activeProjectCount,
+    totalPending,
+  );
 
   return (
     <div className="min-h-screen bg-background">
       <Header
-        subtitle="Freelancer dashboard"
+        subtitle={preferredName ? `${preferredName}'s workspace` : "Freelancer dashboard"}
         onLogout={signOut}
         userEmail={user?.email}
         userId={user?.id}
@@ -541,10 +596,10 @@ export default function Dashboard() {
                 )}
               </div>
               <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">
-                {preferredName ? `Welcome back, ${preferredName}` : "Welcome to Parlo"}
+                {dashboardGreeting}
               </h1>
               <p className="text-muted-foreground mt-1.5 max-w-xl">
-                Keep client work moving, share approvals, and see what needs your attention.
+                {workspaceMessage}
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -647,7 +702,8 @@ export default function Dashboard() {
             <DialogHeader>
               <DialogTitle>What should we call you?</DialogTitle>
               <DialogDescription>
-                We’ll use this name to personalize your Parlo dashboard.
+                This private name personalizes your dashboard and can be changed
+                later in Settings.
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSavePreferredName} className="space-y-4">
@@ -792,6 +848,21 @@ export default function Dashboard() {
                     </p>
                   </div>
                 </div>
+              </div>
+
+              {/* Display name */}
+              <div className="space-y-2">
+                <Label htmlFor="preferredName-settings">Your name</Label>
+                <Input
+                  id="preferredName-settings"
+                  value={preferredName}
+                  onChange={(e) => setPreferredName(e.target.value)}
+                  placeholder="e.g. Alex"
+                  maxLength={80}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Used for your private dashboard greeting. Clients won’t see it.
+                </p>
               </div>
 
               {/* Display name */}
