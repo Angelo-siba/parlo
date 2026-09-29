@@ -176,6 +176,20 @@ export type Invoice = {
   created_at: string;
 };
 
+export type CalendarEventType = "deadline" | "meeting" | "task" | "reminder";
+
+export type CalendarEvent = {
+  id: string;
+  user_id: string;
+  project_id: string | null;
+  title: string;
+  description: string | null;
+  event_type: CalendarEventType;
+  event_date: string;
+  created_at: string;
+  updated_at: string;
+};
+
 export type FreelancerSettings = {
   user_id: string;
   display_name: string | null;

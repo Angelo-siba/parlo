@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { LogOut } from "lucide-react";
+import { CalendarDays, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export function Header({
@@ -60,6 +60,14 @@ export function Header({
 
         {onLogout && (
           <div className="flex items-center gap-3">
+            <Link
+              href="/calendar"
+              className="hidden items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground sm:flex"
+              data-testid="link-calendar"
+            >
+              <CalendarDays className="h-4 w-4" />
+              Calendar
+            </Link>
             {userEmail && (
               <span className="text-sm text-muted-foreground hidden sm:block truncate max-w-[200px]">
                 {userEmail}

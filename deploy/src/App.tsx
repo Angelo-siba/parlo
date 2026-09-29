@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import Dashboard from "@/pages/dashboard";
+import CalendarPage from "@/pages/calendar";
 import LandingPage from "@/pages/landing";
 import PricingPage from "@/pages/pricing";
 import ProjectDetail from "@/pages/project-detail";
@@ -54,6 +55,7 @@ function ProtectedRouter() {
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
+      <Route path="/calendar" component={CalendarPage} />
       <Route path="/pricing" component={PricingPage} />
       <Route path="/signup" component={AuthPage} />
       <Route path="/login" component={AuthPage} />
