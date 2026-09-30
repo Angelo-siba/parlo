@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import {
   Plus,
@@ -47,6 +47,9 @@ import {
 import { useAuth } from "@/lib/auth";
 import { useTheme } from "next-themes";
 import { Switch } from "@/components/ui/switch";
+import OnboardingChecklist, {
+  Step as OnboardingStep,
+} from "@/components/OnboardingChecklist";
 
 type ProjectWithStats = Project & {
   fileCount: number;
@@ -92,6 +95,7 @@ function getWorkspaceMessage(
 
 export default function Dashboard() {
   const { user, signOut, updatePreferredName } = useAuth();
+  const [, setLocation] = useLocation();
   const { resolvedTheme, setTheme } = useTheme();
   const [projects, setProjects] = useState<ProjectWithStats[]>([]);
   const [loading, setLoading] = useState(true);
@@ -101,6 +105,8 @@ export default function Dashboard() {
   const [clientName, setClientName] = useState("");
   const [clientEmail, setClientEmail] = useState("");
   const [projectSearch, setProjectSearch] = useState("");
+  const [onboardingDismissed, setOnboardingDismissed] = useState(false);
+  const [portalLinkCopied, setPortalLinkCopied] = useState(false);
   const { toast } = useToast();
 
   // Revenue
@@ -242,6 +248,15 @@ export default function Dashboard() {
 
     setPreferredName(nameFromMetadata);
     setNamePromptValue(nameFromMetadata);
+    const onboardingMetadata = user?.user_metadata ?? {};
+    setOnboardingDismissed(
+      onboardingMetadata.parlo_onboarding_dismissed === true ||
+        readOnboardingFlag(user?.id, "dismissed"),
+    );
+    setPortalLinkCopied(
+      onboardingMetadata.parlo_onboarding_portal_link_copied === true ||
+        readOnboardingFlag(user?.id, "portal_link_copied"),
+    );
     if (user && !nameFromMetadata && !hasPromptedForName.current) {
       hasPromptedForName.current = true;
       setNamePromptOpen(true);
@@ -272,6 +287,92 @@ export default function Dashboard() {
 
     setPreferredName(nextName);
     setNamePromptOpen(false);
+  }
+
+  function readOnboardingFlag(userId: string | undefined, flag: string) {
+    if (!userId) return false;
+    try {
+      return (
+        window.localStorage.getItem(`parlo:onboarding:${userId}:${flag}`) ===
+        "true"
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  async function saveOnboardingFlag(metadataKey: string, localFlag: string) {
+    if (!user) return false;
+    try {
+      window.localStorage.setItem(
+        `parlo:onboarding:${user.id}:${localFlag}`,
+        "true",
+      );
+    } catch {
+      // Auth metadata remains the cross-device source of truth.
+    }
+
+    try {
+      const { error } = await supabase.auth.updateUser({
+        data: {
+          ...user.user_metadata,
+          [metadataKey]: true,
+        },
+      });
+      return !error;
+    } catch {
+      return false;
+    }
+  }
+
+  async function handleDismissOnboarding() {
+    setOnboardingDismissed(true);
+    const saved = await saveOnboardingFlag(
+      "parlo_onboarding_dismissed",
+      "dismissed",
+    );
+    if (!saved) {
+      toast({
+        title: "Checklist hidden",
+        description: "Its dismissal is saved on this device.",
+      });
+    }
+  }
+
+  const starterProject =
+    projects.find((project) => project.status === "active") ?? projects[0];
+
+  async function handleCopyStarterPortal() {
+    if (!starterProject) {
+      setOpen(true);
+      return;
+    }
+
+    const portalUrl = new URL(
+      `${import.meta.env.BASE_URL}client/${starterProject.share_token}`,
+      window.location.origin,
+    ).toString();
+
+    try {
+      await navigator.clipboard.writeText(portalUrl);
+      setPortalLinkCopied(true);
+      const saved = await saveOnboardingFlag(
+        "parlo_onboarding_portal_link_copied",
+        "portal_link_copied",
+      );
+      toast({
+        title: "Client portal link copied",
+        description: saved
+          ? "It’s ready to share with your client."
+          : "The link is copied; progress is saved on this device.",
+      });
+    } catch {
+      toast({
+        title: "Couldn't copy portal link",
+        description: "Open the project to copy its link manually.",
+        variant: "destructive",
+      });
+    }
   }
 
   async function handleCreate(e: React.FormEvent) {
@@ -481,6 +582,58 @@ export default function Dashboard() {
     activeProjectCount,
     totalPending,
   );
+  const hasCustomBranding = Boolean(
+    settings?.display_name?.trim() ||
+      settings?.logo_url ||
+      (settings?.accent_color &&
+        settings.accent_color.toLowerCase() !== DEFAULT_ACCENT.toLowerCase()),
+  );
+  const onboardingSteps: OnboardingStep[] = [
+    {
+      id: "project",
+      title: "Create your first project",
+      description: projects.length
+        ? "Your project workspace is ready."
+        : "Add a project and your client’s details.",
+      complete: projects.length > 0,
+      actionLabel: "Create project",
+      onAction: () => setOpen(true),
+    },
+    {
+      id: "brand",
+      title: "Make the portal yours",
+      description: hasCustomBranding
+        ? "Your client portal reflects your business."
+        : "Add your business name, logo, or brand color when you’re ready.",
+      complete: hasCustomBranding,
+      optional: true,
+      actionLabel: "Customize",
+      onAction: () => setSettingsOpen(true),
+    },
+    {
+      id: "file",
+      title: "Add your first deliverable",
+      description: projects.some((project) => project.fileCount > 0)
+        ? "A deliverable is ready for client review."
+        : "Upload a file so your client can review your work.",
+      complete: projects.some((project) => project.fileCount > 0),
+      actionLabel: starterProject ? "Add a file" : "Create project",
+      onAction: () =>
+        starterProject
+          ? setLocation(`/projects/${starterProject.id}`)
+          : setOpen(true),
+    },
+    {
+      id: "share",
+      title: "Share your client portal",
+      description: portalLinkCopied
+        ? "Your portal link is copied and ready to send."
+        : "Copy your secure portal link to share it with a client.",
+      complete: portalLinkCopied,
+      actionLabel: starterProject ? "Copy portal link" : "Create project",
+      onAction: handleCopyStarterPortal,
+    },
+  ];
 
   return (
     <div className="min-h-screen bg-background">
@@ -583,6 +736,15 @@ export default function Dashboard() {
             </Dialog>
           </div>
         </div>
+
+        {!loading && !onboardingDismissed && (
+          <div className="mb-6">
+            <OnboardingChecklist
+              steps={onboardingSteps}
+              onDismiss={handleDismissOnboarding}
+            />
+          </div>
+        )}
 
         <Dialog open={namePromptOpen} onOpenChange={setNamePromptOpen}>
           <DialogContent className="max-w-md">
