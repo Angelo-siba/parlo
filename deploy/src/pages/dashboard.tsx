@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { format, startOfMonth, endOfMonth } from "date-fns";
+import { differenceInCalendarDays, format, parseISO, startOfDay, startOfMonth, endOfMonth } from "date-fns";
 import {
+  ArrowRight,
+  CalendarDays,
+  MessageSquare,
+  Receipt,
   Plus,
   FolderOpen,
   Mail,
@@ -63,6 +67,7 @@ type ProjectWithStats = Project & {
   fileCount: number;
   pendingCount: number;
   approvedCount: number;
+  changesRequestedCount: number;
 };
 
 function generateShareToken() {
@@ -108,6 +113,7 @@ export default function Dashboard() {
   const [isPro, setIsPro] = useState(() => isProUser(user));
   const [billingLoading, setBillingLoading] = useState(Boolean(user));
   const [projects, setProjects] = useState<ProjectWithStats[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const activeProjectCount = projects.filter((project) => project.status === "active").length;
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -156,6 +162,7 @@ export default function Dashboard() {
         description: error.message,
         variant: "destructive",
       });
+      setInvoices([]);
       setLoading(false);
       return;
     }
@@ -164,7 +171,7 @@ export default function Dashboard() {
 
     const stats = new Map<
       string,
-      { fileCount: number; pendingCount: number; approvedCount: number }
+      { fileCount: number; pendingCount: number; approvedCount: number; changesRequestedCount: number }
     >();
     const latestByGroup = new Map<string, ProjectFile>();
     (filesData ?? []).forEach((f: ProjectFile) => {
@@ -182,15 +189,16 @@ export default function Dashboard() {
         fileCount: 0,
         pendingCount: 0,
         approvedCount: 0,
+        changesRequestedCount: 0,
       };
       cur.fileCount++;
-      if (
-        (f.review_status ?? (f.approved ? "approved" : "pending")) ===
-        "approved"
-      ) {
+      const reviewStatus = f.review_status ?? (f.approved ? "approved" : "pending");
+      if (reviewStatus === "approved") {
         cur.approvedCount++;
+      } else {
+        cur.pendingCount++;
+        if (reviewStatus === "changes_requested") cur.changesRequestedCount++;
       }
-      else cur.pendingCount++;
       stats.set(f.project_id, cur);
     });
 
@@ -200,19 +208,20 @@ export default function Dashboard() {
         fileCount: 0,
         pendingCount: 0,
         approvedCount: 0,
+        changesRequestedCount: 0,
       }),
     }));
     setProjects(projectList);
-    setLoading(false);
 
     // Fetch invoices for revenue stats
     if (projectList.length > 0) {
       const ids = projectList.map((p: Project) => p.id);
       const { data: invoices } = await supabase
         .from("invoices")
-        .select("total_amount, status, created_at")
+        .select("*")
         .in("project_id", ids);
 
+      setInvoices((invoices ?? []) as Invoice[]);
       if (invoices) {
         const now = new Date();
         const monthStart = startOfMonth(now).toISOString();
@@ -234,7 +243,13 @@ export default function Dashboard() {
         setOutstanding(out);
         setThisMonthRevenue(monthRev);
       }
+    } else {
+      setInvoices([]);
+      setTotalRevenue(0);
+      setOutstanding(0);
+      setThisMonthRevenue(0);
     }
+    setLoading(false);
   }
 
   async function loadSubscription() {
@@ -629,7 +644,7 @@ export default function Dashboard() {
     loadSettings();
   }
 
-  const totalPending = projects.reduce((s, p) => s + p.pendingCount, 0);
+  const totalPending = projects.reduce((s, p) => s + Math.max(0, p.pendingCount - p.changesRequestedCount), 0);
   const totalApproved = projects.reduce((s, p) => s + p.approvedCount, 0);
   const hasRevenue = totalRevenue > 0 || outstanding > 0 || thisMonthRevenue > 0;
   const normalizedProjectSearch = projectSearch.trim().toLowerCase();
@@ -719,6 +734,8 @@ export default function Dashboard() {
       onAction: handleCopyStarterPortal,
     },
   ];
+
+  const todayActions = buildTodayActions(projects, invoices);
 
   return (
     <div className="min-h-screen bg-background">
@@ -858,6 +875,8 @@ export default function Dashboard() {
             />
           </div>
         )}
+
+        {projects.length > 0 && <TodayQueue actions={todayActions} loading={loading} />}
 
         <Dialog open={namePromptOpen} onOpenChange={setNamePromptOpen}>
           <DialogContent className="max-w-md">
@@ -1122,11 +1141,6 @@ export default function Dashboard() {
           </div>
         )}
 
-        {totalPending > 0 && (
-          <ReminderBar
-            projects={projects.filter((p) => p.pendingCount > 0)}
-          />
-        )}
 
         {loading ? (
           <div className="text-muted-foreground py-12 text-center">
@@ -1364,42 +1378,178 @@ function RevenueCard({
   );
 }
 
-function ReminderBar({ projects }: { projects: ProjectWithStats[] }) {
-  function buildReminderMailto(p: ProjectWithStats) {
-    const link = `${window.location.origin}${import.meta.env.BASE_URL}client/${p.share_token}`;
-    const subject = encodeURIComponent(`Reminder: pending approval for ${p.name}`);
-    const body = encodeURIComponent(
-      `Hi ${p.client_name},\n\nJust a friendly reminder that there ${p.pendingCount === 1 ? "is 1 file" : `are ${p.pendingCount} files`} waiting for your review on the ${p.name} project.\n\nReview here: ${link}\n\nThanks!`,
-    );
-    return `mailto:${p.client_email}?subject=${subject}&body=${body}`;
+type TodayActionKind = "invoice-overdue" | "feedback" | "client-review" | "invoice-due" | "first-deliverable";
+
+type TodayAction = {
+  id: string;
+  kind: TodayActionKind;
+  priority: number;
+  sortAt?: number;
+  title: string;
+  detail: string;
+  tag: string;
+  actionLabel: string;
+  href: string;
+  external?: boolean;
+};
+
+function buildTodayActions(projects: ProjectWithStats[], invoices: Invoice[]): TodayAction[] {
+  const actions: TodayAction[] = [];
+  const today = startOfDay(new Date());
+  const projectById = new Map(projects.map((project) => [project.id, project]));
+
+  function clientPortalUrl(project: ProjectWithStats) {
+    const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
+    return window.location.origin + basePath + "/client/" + project.share_token;
   }
 
+  function reminderLink(project: ProjectWithStats, invoice?: Invoice, reviewCount = project.pendingCount) {
+    const portalUrl = clientPortalUrl(project);
+    const subject = invoice
+      ? "Reminder: invoice " + invoice.invoice_number + " for " + project.name
+      : "Reminder: files ready for review — " + project.name;
+    const message = invoice
+      ? "Hi " + project.client_name + ",\n\nJust a friendly reminder that invoice " + invoice.invoice_number + " (" + invoice.total_amount.toLocaleString("en-US", { style: "currency", currency: "USD" }) + ") for " + project.name + " was due " + format(parseISO(invoice.due_date), "MMM d, yyyy") + ".\n\nYou can view and pay it here: " + portalUrl + "\n\nThanks!"
+      : "Hi " + project.client_name + ",\n\nJust a friendly reminder that " + reviewCount + " file" + (reviewCount === 1 ? " is" : "s are") + " waiting for your review on " + project.name + ".\n\nReview here: " + portalUrl + "\n\nThanks!";
+    return "mailto:" + project.client_email + "?subject=" + encodeURIComponent(subject) + "&body=" + encodeURIComponent(message);
+  }
+
+  for (const invoice of invoices) {
+    if (invoice.status !== "sent" || !invoice.due_date) continue;
+    const project = projectById.get(invoice.project_id);
+    if (!project) continue;
+    const dueDate = parseISO(invoice.due_date);
+    if (Number.isNaN(dueDate.getTime())) continue;
+    const daysUntilDue = differenceInCalendarDays(dueDate, today);
+    const amount = invoice.total_amount.toLocaleString("en-US", { style: "currency", currency: "USD" });
+    if (daysUntilDue < 0) {
+      actions.push({
+        id: "invoice-overdue-" + invoice.id,
+        kind: "invoice-overdue",
+        priority: 0,
+        sortAt: dueDate.getTime(),
+        title: "Follow up on an overdue invoice",
+        detail: invoice.invoice_number + " for " + project.name + " · " + amount + " · due " + format(dueDate, "MMM d"),
+        tag: "Overdue",
+        actionLabel: "Draft reminder",
+        href: reminderLink(project, invoice),
+        external: true,
+      });
+    } else if (daysUntilDue <= 7) {
+      actions.push({
+        id: "invoice-due-" + invoice.id,
+        kind: "invoice-due",
+        priority: daysUntilDue === 0 ? 2 : 4,
+        sortAt: dueDate.getTime(),
+        title: daysUntilDue === 0 ? "Invoice is due today" : "Invoice due soon",
+        detail: invoice.invoice_number + " for " + project.name + " · " + amount + " · " + (daysUntilDue === 0 ? "due today" : "due in " + daysUntilDue + " day" + (daysUntilDue === 1 ? "" : "s")),
+        tag: daysUntilDue === 0 ? "Due today" : "Due in " + daysUntilDue + "d",
+        actionLabel: "Open project",
+        href: "/projects/" + project.id,
+      });
+    }
+  }
+
+  for (const project of projects) {
+    if (project.changesRequestedCount > 0) {
+      actions.push({
+        id: "feedback-" + project.id,
+        kind: "feedback",
+        priority: 1,
+        title: "Review client feedback",
+        detail: project.client_name + " requested changes on " + project.changesRequestedCount + " file" + (project.changesRequestedCount === 1 ? "" : "s") + " in " + project.name + ".",
+        tag: "Needs you",
+        actionLabel: "Review feedback",
+        href: "/projects/" + project.id,
+      });
+    }
+
+    const awaitingClient = Math.max(0, project.pendingCount - project.changesRequestedCount);
+    if (awaitingClient > 0) {
+      actions.push({
+        id: "review-" + project.id,
+        kind: "client-review",
+        priority: 3,
+        title: "Follow up on client review",
+        detail: awaitingClient + " deliverable" + (awaitingClient === 1 ? " is" : "s are") + " waiting for " + project.client_name + " on " + project.name + ".",
+        tag: "Waiting on client",
+        actionLabel: "Draft reminder",
+        href: reminderLink(project, undefined, awaitingClient),
+        external: true,
+      });
+    }
+
+    if (project.status === "active" && project.fileCount === 0) {
+      actions.push({
+        id: "first-deliverable-" + project.id,
+        kind: "first-deliverable",
+        priority: 5,
+        title: "Share the first deliverable",
+        detail: project.name + " is active, but there are no files in the client portal yet.",
+        tag: "Project setup",
+        actionLabel: "Open project",
+        href: "/projects/" + project.id,
+      });
+    }
+  }
+
+  return actions.sort((a, b) => a.priority - b.priority || (a.sortAt ?? 0) - (b.sortAt ?? 0));
+}
+
+function TodayQueue({ actions, loading }: { actions: TodayAction[]; loading: boolean }) {
+  const iconByKind = {
+    "invoice-overdue": Receipt,
+    feedback: MessageSquare,
+    "client-review": Mail,
+    "invoice-due": Clock,
+    "first-deliverable": Upload,
+  };
+  const tagStyles: Record<TodayActionKind, string> = {
+    "invoice-overdue": "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300",
+    feedback: "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-300",
+    "client-review": "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-300",
+    "invoice-due": "border-border bg-muted text-muted-foreground",
+    "first-deliverable": "border-border bg-muted text-muted-foreground",
+  };
+
   return (
-    <Card className="mb-6 border-primary/30 bg-primary/5">
-      <CardContent className="py-4">
-        <div className="flex items-start gap-3">
-          <AlertCircle className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
-          <div className="flex-1 min-w-0">
-            <div className="font-medium text-sm">Pending approval reminders</div>
-            <p className="text-xs text-muted-foreground mt-0.5 mb-3">
-              Send a quick nudge to clients with files awaiting review.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {projects.map((p) => (
-                <a
-                  key={p.id}
-                  href={buildReminderMailto(p)}
-                  data-testid={`link-remind-${p.id}`}
-                >
-                  <Button size="sm" variant="outline" className="h-8">
-                    <Mail className="h-3 w-3 mr-1.5" />
-                    Remind {p.client_name} ({p.pendingCount})
-                  </Button>
-                </a>
-              ))}
-            </div>
-          </div>
+    <Card className="mb-6 overflow-hidden border-primary/20">
+      <CardHeader className="flex flex-row items-start justify-between gap-4 pb-3">
+        <div>
+          <CardTitle className="flex items-center gap-2 text-lg"><CalendarDays className="h-5 w-5 text-primary" />Today’s next steps</CardTitle>
+          <p className="mt-1 text-sm text-muted-foreground">A prioritized view of what can move your client work forward.</p>
         </div>
+        {!loading && <Badge variant={actions.length > 0 ? "secondary" : "outline"}>{actions.length > 0 ? actions.length + " action" + (actions.length === 1 ? "" : "s") : "All clear"}</Badge>}
+      </CardHeader>
+      <CardContent className="px-5 pb-4 pt-0 sm:px-6">
+        {loading ? (
+          <p className="py-4 text-sm text-muted-foreground">Checking projects, feedback, and invoices…</p>
+        ) : actions.length === 0 ? (
+          <div className="flex items-start gap-3 rounded-xl bg-muted/50 p-4">
+            <CheckCircle2 className="mt-0.5 h-5 w-5 flex-shrink-0 text-emerald-600" />
+            <div><p className="text-sm font-medium">You’re clear for now.</p><p className="mt-1 text-sm text-muted-foreground">No client reviews, feedback, or upcoming payments need attention.</p></div>
+          </div>
+        ) : (
+          <div className="divide-y divide-border/70">
+            {actions.map((action) => {
+              const Icon = iconByKind[action.kind];
+              const ActionTag = <Badge variant="outline" className={"shrink-0 " + tagStyles[action.kind]}>{action.tag}</Badge>;
+              const ActionButton = <><span>{action.actionLabel}</span><ArrowRight className="h-3.5 w-3.5" /></>;
+              return (
+                <div key={action.id} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center">
+                  <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><Icon className="h-4 w-4" /></div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2"><p className="text-sm font-medium">{action.title}</p>{ActionTag}</div>
+                    <p className="mt-1 text-sm text-muted-foreground">{action.detail}</p>
+                  </div>
+                  <Button asChild size="sm" variant={action.kind === "invoice-overdue" || action.kind === "feedback" ? "default" : "outline"} className="self-start sm:self-center">
+                    {action.external ? <a href={action.href} data-testid={"today-action-" + action.id}>{ActionButton}</a> : <Link href={action.href} data-testid={"today-action-" + action.id}>{ActionButton}</Link>}
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
