@@ -1,4 +1,4 @@
-import { ArrowRight, ArrowUpRight, Camera, Check, CheckCircle2, Clock3, Download, FileCheck2, FolderKanban, Palette, Receipt, Sparkles, Video, Zap } from "lucide-react";
+import { ArrowRight, ArrowUpRight, BookOpen, Camera, Check, CheckCircle2, Clock3, Download, FileCheck2, FolderKanban, Palette, Receipt, Sparkles, Video, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const orange = "#d4521a";
@@ -102,6 +102,7 @@ const TEMPLATE_RESOURCES = [
     title: "Client brief & proposal",
     description: "Turn a discovery call into a clear, professional starting point.",
     file: "parlo-client-brief-proposal-template.docx",
+    format: "DOCX",
     sections: ["Project snapshot", "Goals, scope & timeline", "Investment and next steps"],
     icon: FileCheck2,
   },
@@ -110,6 +111,7 @@ const TEMPLATE_RESOURCES = [
     title: "Scope of work",
     description: "Make deliverables, revisions, and boundaries impossible to misremember.",
     file: "parlo-scope-of-work-template.docx",
+    format: "DOCX",
     sections: ["Deliverables & revisions", "What's out of scope", "Timeline and change requests"],
     icon: FolderKanban,
   },
@@ -118,8 +120,18 @@ const TEMPLATE_RESOURCES = [
     title: "Late-payment invoice terms",
     description: "Set payment expectations before chasing money becomes part of the job.",
     file: "parlo-late-payment-invoice-template.docx",
+    format: "DOCX",
     sections: ["Itemized charges", "Late payment policy", "Reminder and notice steps"],
     icon: Receipt,
+  },
+  {
+    eyebrow: "Business guide",
+    title: "The Freelancer’s Business OS",
+    description: "A practical guide to landing clients, pricing your work, managing time, and building reliable business systems.",
+    file: "parlo-freelancer-business-os.pdf",
+    format: "PDF",
+    sections: ["Six practical modules", "A 30-day launch plan", "Scripts, formulas, and weekly routines"],
+    icon: BookOpen,
   },
 ];
 
@@ -142,7 +154,7 @@ function TemplateCard({ resource }: { resource: (typeof TEMPLATE_RESOURCES)[numb
           ))}
         </ul>
       </div>
-      <a href={`/templates/${resource.file}`} download className="mt-7 inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-[#d8c5b8] px-4 text-sm font-semibold text-[#b44819] transition-colors hover:bg-[#fff0e9]">Download .DOCX <Download className="h-4 w-4" /></a>
+      <a href={`/templates/${resource.file}`} download className="mt-7 inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-[#d8c5b8] px-4 text-sm font-semibold text-[#b44819] transition-colors hover:bg-[#fff0e9]">Download {resource.format} <Download className="h-4 w-4" /></a>
     </article>
   );
 }
@@ -175,14 +187,14 @@ export default function LandingPage() {
            <div className="mx-auto max-w-7xl">
              <div className="max-w-2xl">
                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#d4521a]">Free resources</p>
-               <h2 className="mt-4 text-4xl font-semibold leading-tight tracking-[-0.04em] text-[#2c211b] sm:text-5xl">The paperwork that makes you look established.</h2>
-               <p className="mt-5 max-w-xl text-lg leading-8 text-[#75665d]">Start with the same documents we built for freelancers who want clearer projects, firmer boundaries, and fewer awkward follow-ups. No account required.</p>
+                <h2 className="mt-4 text-4xl font-semibold leading-tight tracking-[-0.04em] text-[#2c211b] sm:text-5xl">Free resources to run your freelance business.</h2>
+                <p className="mt-5 max-w-xl text-lg leading-8 text-[#75665d]">Get ready-to-use client documents and a practical guide to finding clients, pricing your work, and building consistent systems. No account required.</p>
              </div>
-             <div className="mt-12 grid gap-5 lg:grid-cols-3">
+              <div className="mt-12 grid gap-5 lg:grid-cols-2 xl:grid-cols-4">
                {TEMPLATE_RESOURCES.map((resource) => <TemplateCard key={resource.file} resource={resource} />)}
              </div>
              <div className="mt-8 flex flex-col items-start justify-between gap-4 rounded-xl border border-[#e4d7cc] bg-[#fffdfa] px-5 py-4 text-sm sm:flex-row sm:items-center sm:px-6">
-               <p className="text-[#75665d]">Download the templates free. Use Parlo when you’re ready to keep the whole project in one place.</p>
+                <p className="text-[#75665d]">Download every resource free. Use Parlo when you’re ready to keep the whole project in one place.</p>
                <a href="/signup" className="inline-flex flex-shrink-0 items-center gap-2 font-semibold text-[#b44819] hover:text-[#8f3714]">Try Parlo free <ArrowRight className="h-4 w-4" /></a>
              </div>
            </div>
