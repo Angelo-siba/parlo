@@ -21,6 +21,8 @@ import {
   Hourglass,
   Upload,
   ArrowUpRight,
+  ListTodo,
+  Check,
 } from "lucide-react";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
@@ -48,6 +50,7 @@ import {
   FreelancerSettings,
   STORAGE_BUCKET,
   loadAllProjectFiles,
+  CalendarEvent,
 } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import {
@@ -77,6 +80,10 @@ function generateShareToken() {
 }
 
 const DEFAULT_ACCENT = "#d4521a";
+
+function localDateKey(date = new Date()) {
+  return date.getFullYear() + "-" + String(date.getMonth() + 1).padStart(2, "0") + "-" + String(date.getDate()).padStart(2, "0");
+}
 
 function getDashboardGreeting(name: string) {
   const hour = new Date().getHours();
@@ -114,6 +121,7 @@ export default function Dashboard() {
   const [billingLoading, setBillingLoading] = useState(Boolean(user));
   const [projects, setProjects] = useState<ProjectWithStats[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [calendarTasks, setCalendarTasks] = useState<CalendarEvent[]>([]);
   const activeProjectCount = projects.filter((project) => project.status === "active").length;
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -213,6 +221,16 @@ export default function Dashboard() {
     }));
     setProjects(projectList);
 
+    const { data: openTasks } = await supabase
+      .from("calendar_events")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("event_type", "task")
+      .is("completed_at", null)
+      .lte("event_date", localDateKey())
+      .order("event_date", { ascending: true });
+    setCalendarTasks((openTasks ?? []) as CalendarEvent[]);
+
     // Fetch invoices for revenue stats
     if (projectList.length > 0) {
       const ids = projectList.map((p: Project) => p.id);
@@ -250,6 +268,20 @@ export default function Dashboard() {
       setThisMonthRevenue(0);
     }
     setLoading(false);
+  }
+
+  async function completeTodayTask(taskId: string) {
+    const { error } = await supabase
+      .from("calendar_events")
+      .update({ completed_at: new Date().toISOString() })
+      .eq("id", taskId)
+      .eq("user_id", user?.id ?? "");
+    if (error) {
+      toast({ title: "Couldn't complete task", description: error.message, variant: "destructive" });
+      return;
+    }
+    setCalendarTasks((tasks) => tasks.filter((task) => task.id !== taskId));
+    toast({ title: "Task completed" });
   }
 
   async function loadSubscription() {
@@ -735,7 +767,7 @@ export default function Dashboard() {
     },
   ];
 
-  const todayActions = buildTodayActions(projects, invoices);
+  const todayActions = buildTodayActions(projects, invoices, calendarTasks);
 
   return (
     <div className="min-h-screen bg-background">
@@ -876,7 +908,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {projects.length > 0 && <TodayQueue actions={todayActions} loading={loading} />}
+        {projects.length > 0 && <TodayQueue actions={todayActions} loading={loading} onCompleteTask={completeTodayTask} />}
 
         <Dialog open={namePromptOpen} onOpenChange={setNamePromptOpen}>
           <DialogContent className="max-w-md">
@@ -1378,7 +1410,7 @@ function RevenueCard({
   );
 }
 
-type TodayActionKind = "invoice-overdue" | "feedback" | "client-review" | "invoice-due" | "first-deliverable";
+type TodayActionKind = "invoice-overdue" | "feedback" | "client-review" | "invoice-due" | "first-deliverable" | "task";
 
 type TodayAction = {
   id: string;
@@ -1391,9 +1423,10 @@ type TodayAction = {
   actionLabel: string;
   href: string;
   external?: boolean;
+  taskId?: string;
 };
 
-function buildTodayActions(projects: ProjectWithStats[], invoices: Invoice[]): TodayAction[] {
+function buildTodayActions(projects: ProjectWithStats[], invoices: Invoice[], calendarTasks: CalendarEvent[]): TodayAction[] {
   const actions: TodayAction[] = [];
   const today = startOfDay(new Date());
   const projectById = new Map(projects.map((project) => [project.id, project]));
@@ -1450,8 +1483,28 @@ function buildTodayActions(projects: ProjectWithStats[], invoices: Invoice[]): T
     }
   }
 
+  for (const task of calendarTasks) {
+    if (task.event_date > localDateKey()) continue;
+    const project = task.project_id ? projectById.get(task.project_id) : undefined;
+    if (task.project_id && !project) continue;
+    const description = task.description?.trim();
+    actions.push({
+      id: "task-" + task.id,
+      kind: "task",
+      priority: 2,
+      sortAt: parseISO(task.event_date).getTime(),
+      title: task.title,
+      detail: (project ? project.name + " · " : "") + (description || "Task due today"),
+      tag: task.title.startsWith("Review feedback:") ? "Client feedback" : "Task",
+      actionLabel: project ? "Open project" : "View workspace",
+      href: project ? "/projects/" + project.id : "/",
+      taskId: task.id,
+    });
+  }
+
   for (const project of projects) {
-    if (project.changesRequestedCount > 0) {
+    const hasFeedbackTask = calendarTasks.some((task) => task.project_id === project.id && task.title.startsWith("Review feedback:"));
+    if (project.changesRequestedCount > 0 && !hasFeedbackTask) {
       actions.push({
         id: "feedback-" + project.id,
         kind: "feedback",
@@ -1496,13 +1549,14 @@ function buildTodayActions(projects: ProjectWithStats[], invoices: Invoice[]): T
   return actions.sort((a, b) => a.priority - b.priority || (a.sortAt ?? 0) - (b.sortAt ?? 0));
 }
 
-function TodayQueue({ actions, loading }: { actions: TodayAction[]; loading: boolean }) {
+function TodayQueue({ actions, loading, onCompleteTask }: { actions: TodayAction[]; loading: boolean; onCompleteTask: (taskId: string) => void }) {
   const iconByKind = {
     "invoice-overdue": Receipt,
     feedback: MessageSquare,
     "client-review": Mail,
     "invoice-due": Clock,
     "first-deliverable": Upload,
+    task: ListTodo,
   };
   const tagStyles: Record<TodayActionKind, string> = {
     "invoice-overdue": "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300",
@@ -1510,6 +1564,7 @@ function TodayQueue({ actions, loading }: { actions: TodayAction[]; loading: boo
     "client-review": "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-300",
     "invoice-due": "border-border bg-muted text-muted-foreground",
     "first-deliverable": "border-border bg-muted text-muted-foreground",
+    task: "border-primary/20 bg-primary/5 text-primary",
   };
 
   return (
@@ -1542,9 +1597,16 @@ function TodayQueue({ actions, loading }: { actions: TodayAction[]; loading: boo
                     <div className="flex flex-wrap items-center gap-2"><p className="text-sm font-medium">{action.title}</p>{ActionTag}</div>
                     <p className="mt-1 text-sm text-muted-foreground">{action.detail}</p>
                   </div>
-                  <Button asChild size="sm" variant={action.kind === "invoice-overdue" || action.kind === "feedback" ? "default" : "outline"} className="self-start sm:self-center">
-                    {action.external ? <a href={action.href} data-testid={"today-action-" + action.id}>{ActionButton}</a> : <Link href={action.href} data-testid={"today-action-" + action.id}>{ActionButton}</Link>}
-                  </Button>
+                  <div className="flex shrink-0 items-center gap-1.5 self-start sm:self-center">
+                    <Button asChild size="sm" variant={action.kind === "invoice-overdue" || action.kind === "feedback" ? "default" : "outline"}>
+                      {action.external ? <a href={action.href} data-testid={"today-action-" + action.id}>{ActionButton}</a> : <Link href={action.href} data-testid={"today-action-" + action.id}>{ActionButton}</Link>}
+                    </Button>
+                    {action.taskId && (
+                      <Button type="button" size="sm" variant="ghost" onClick={() => onCompleteTask(action.taskId!)} data-testid={"today-complete-task-" + action.taskId}>
+                        <Check className="mr-1.5 h-4 w-4" />Done
+                      </Button>
+                    )}
+                  </div>
                 </div>
               );
             })}
