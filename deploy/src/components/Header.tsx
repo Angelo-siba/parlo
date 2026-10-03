@@ -77,19 +77,23 @@ export function Header({
             <div className="flex items-center gap-3">
               <Link
                 href="/calendar"
-                className="hidden items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground sm:flex"
+                className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground"
                 data-testid="link-calendar"
+                aria-label="Calendar"
+                title="Calendar"
               >
                 <CalendarDays className="h-4 w-4" />
-                Calendar
+                <span className="hidden lg:inline">Calendar</span>
               </Link>
               <Link
                 href="/notebook"
-                className="hidden items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground sm:flex"
+                className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground"
                 data-testid="link-notebook"
+                aria-label="Notebook"
+                title="Notebook"
               >
                 <BookOpen className="h-4 w-4" />
-                Notebook
+                <span className="hidden lg:inline">Notebook</span>
               </Link>
               {isPro && (
                 <span
