@@ -24,7 +24,6 @@ import {
   Pencil,
   Archive,
   ListTodo,
-  BookOpen,
 } from "lucide-react";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
@@ -128,11 +127,6 @@ export default function ProjectDetail() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [projectTasks, setProjectTasks] = useState<CalendarEvent[]>([]);
   const [creatingTaskFor, setCreatingTaskFor] = useState<string | null>(null);
-  const [projectNote, setProjectNote] = useState("");
-  const [notesLoaded, setNotesLoaded] = useState(false);
-  const [noteStatus, setNoteStatus] = useState<"saved" | "unsaved" | "saving" | "error">("saved");
-  const [noteSavedAt, setNoteSavedAt] = useState<string | null>(null);
-  const noteDraftRef = useRef("");
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [versioningFileId, setVersioningFileId] = useState<string | null>(null);
@@ -184,41 +178,15 @@ export default function ProjectDetail() {
     setBillingLoading(false);
   }
 
-  useEffect(() => {
-    if (!notesLoaded || noteStatus !== "unsaved" || !project || !user) return;
-    const content = projectNote;
-    const timeout = window.setTimeout(async () => {
-      setNoteStatus("saving");
-      const { error } = await supabase.from("project_notes").upsert(
-        { project_id: project.id, user_id: user.id, content },
-        { onConflict: "project_id" },
-      );
-      if (error) {
-        if (noteDraftRef.current === content) {
-          setNoteStatus("error");
-          toast({ title: "Couldn't save notebook", description: error.message, variant: "destructive" });
-        } else {
-          setNoteStatus("unsaved");
-        }
-        return;
-      }
-      setNoteSavedAt(new Date().toISOString());
-      setNoteStatus(noteDraftRef.current === content ? "saved" : "unsaved");
-    }, 700);
-    return () => window.clearTimeout(timeout);
-  }, [projectNote, noteStatus, notesLoaded, project?.id, user?.id, toast]);
-
   async function loadAll() {
     if (!projectId) return;
     setLoading(true);
-    setNotesLoaded(false);
     const [
       { data: p, error: pErr },
        fileResult,
       { data: a },
       { data: inv },
       { data: taskRows },
-      { data: noteRow, error: noteError },
     ] = await Promise.all([
       supabase.from("projects").select("*").eq("id", projectId).single(),
       loadProjectFiles(projectId),
@@ -240,11 +208,6 @@ export default function ProjectDetail() {
         .eq("event_type", "task")
         .is("completed_at", null)
         .order("event_date", { ascending: true }),
-      supabase
-        .from("project_notes")
-        .select("content, updated_at")
-        .eq("project_id", projectId)
-        .maybeSingle(),
     ]);
     if (pErr) {
       toast({
@@ -268,17 +231,6 @@ export default function ProjectDetail() {
     setActivity((a ?? []) as ActivityLog[]);
     setInvoices((inv ?? []) as Invoice[]);
     setProjectTasks((taskRows ?? []) as CalendarEvent[]);
-    if (noteError) {
-      toast({ title: "Couldn't load project notebook", description: noteError.message, variant: "destructive" });
-      setNotesLoaded(false);
-    } else {
-      const content = noteRow?.content ?? "";
-      noteDraftRef.current = content;
-      setProjectNote(content);
-      setNoteSavedAt(noteRow?.updated_at ?? null);
-      setNoteStatus("saved");
-      setNotesLoaded(true);
-    }
     setLoading(false);
   }
 
@@ -1482,53 +1434,6 @@ export default function ProjectDetail() {
             </div>
           </CardContent>
         </Card>
-
-        {project && (
-          <Card className="mb-5 overflow-hidden border-primary/15">
-            <CardContent className="p-5 sm:p-6">
-              <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="flex items-start gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><BookOpen className="h-5 w-5" /></div>
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="font-semibold">Project notebook</h2>
-                      <Badge variant="secondary" className={noteStatus === "error" ? "bg-destructive/10 text-destructive" : ""}>
-                        {noteStatus === "saving" ? "Saving…" : noteStatus === "unsaved" ? "Unsaved" : noteStatus === "error" ? "Save failed" : "Saved"}
-                      </Badge>
-                    </div>
-                    <p className="mt-1 text-sm text-muted-foreground">Private notes for decisions, reminders, and next steps.</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground sm:pt-1">
-                  <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                  Autosaves to this project
-                </div>
-              </div>
-              <Textarea
-                value={projectNote}
-                onChange={(event) => {
-                  noteDraftRef.current = event.target.value;
-                  setProjectNote(event.target.value);
-                  setNoteStatus("unsaved");
-                }}
-                placeholder="Capture a decision, a client follow-up, or the next thing to tackle…"
-                maxLength={20000}
-                disabled={!notesLoaded}
-                className="min-h-[180px] resize-y rounded-xl border-border/70 bg-background/80 leading-relaxed shadow-sm placeholder:text-muted-foreground/70 focus-visible:ring-primary/25"
-                aria-label="Private project notebook"
-                data-testid="textarea-project-notebook"
-              />
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-                <span>Only you can see these notes.</span>
-                <div className="flex items-center gap-3">
-                  {noteStatus === "error" && <Button type="button" variant="ghost" size="sm" className="h-7 px-2" onClick={() => setNoteStatus("unsaved")}>Retry save</Button>}
-                  <span>{projectNote.length.toLocaleString()} / 20,000</span>
-                  {noteStatus === "saved" && noteSavedAt && <span>Saved {formatDistanceToNow(new Date(noteSavedAt), { addSuffix: true })}</span>}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
         {legacyFileSchema && (
           <Card className="mb-4 border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/20">
