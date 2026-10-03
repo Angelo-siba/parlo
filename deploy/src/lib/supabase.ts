@@ -186,6 +186,7 @@ export type CalendarEvent = {
   description: string | null;
   event_type: CalendarEventType;
   event_date: string;
+  completed_at: string | null;
   created_at: string;
   updated_at: string;
 };
