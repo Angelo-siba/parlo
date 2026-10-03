@@ -12,12 +12,20 @@ CREATE TABLE IF NOT EXISTS public.calendar_events (
   event_type   text not null default 'task'
                check (event_type in ('deadline', 'meeting', 'task', 'reminder')),
   event_date   date not null,
+  completed_at timestamptz,
   created_at   timestamptz not null default now(),
   updated_at   timestamptz not null default now()
 );
 
+ALTER TABLE public.calendar_events
+  ADD COLUMN IF NOT EXISTS completed_at timestamptz;
+
 CREATE INDEX IF NOT EXISTS calendar_events_user_date_idx
   ON public.calendar_events(user_id, event_date);
+
+CREATE INDEX IF NOT EXISTS calendar_events_open_tasks_idx
+  ON public.calendar_events(user_id, event_date)
+  WHERE event_type = 'task' AND completed_at IS NULL;
 
 ALTER TABLE public.calendar_events ENABLE ROW LEVEL SECURITY;
 
