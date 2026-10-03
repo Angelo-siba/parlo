@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { CalendarDays, LogOut } from "lucide-react";
+import { BookOpen, CalendarDays, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getCheckoutUrl } from "@/lib/billing";
 
@@ -82,6 +82,14 @@ export function Header({
               >
                 <CalendarDays className="h-4 w-4" />
                 Calendar
+              </Link>
+              <Link
+                href="/notebook"
+                className="hidden items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground sm:flex"
+                data-testid="link-notebook"
+              >
+                <BookOpen className="h-4 w-4" />
+                Notebook
               </Link>
               {isPro && (
                 <span
