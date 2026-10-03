@@ -23,6 +23,11 @@ import {
   RefreshCw,
   Pencil,
   Archive,
+  ListTodo,
+  Timer,
+  Play,
+  Pause,
+  Square,
 } from "lucide-react";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
@@ -49,6 +54,7 @@ import {
   ProjectStatus,
   PROJECT_STATUSES,
   ActivityLog,
+  CalendarEvent,
   Invoice,
   InvoiceLineItem,
   logActivity,
@@ -64,6 +70,39 @@ import {
 
 const MAX_FILE_SIZE_MB = 50;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+
+type StoredFocusState = {
+  active: { projectId: string; projectName: string; startedAt: number | null; elapsedMs: number } | null;
+  totals: Record<string, number>;
+};
+
+function readFocusState(userId?: string | null): StoredFocusState {
+  if (!userId || typeof window === "undefined") return { active: null, totals: {} };
+  try {
+    const saved = window.localStorage.getItem("parlo-focus-time-" + userId);
+    if (!saved) return { active: null, totals: {} };
+    const parsed = JSON.parse(saved) as StoredFocusState;
+    return { active: parsed.active ?? null, totals: parsed.totals ?? {} };
+  } catch {
+    return { active: null, totals: {} };
+  }
+}
+
+function formatFocusDuration(milliseconds: number) {
+  const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return [hours, minutes, seconds].map((part) => String(part).padStart(2, "0")).join(":");
+}
+
+function localDateKey(date = new Date()) {
+  return date.getFullYear() + "-" + String(date.getMonth() + 1).padStart(2, "0") + "-" + String(date.getDate()).padStart(2, "0");
+}
+
+function feedbackTaskTitle(fileName: string) {
+  return "Review feedback: " + fileName;
+}
 
 function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -115,6 +154,11 @@ export default function ProjectDetail() {
   const [files, setFiles] = useState<ProjectFile[]>([]);
   const [activity, setActivity] = useState<ActivityLog[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [projectTasks, setProjectTasks] = useState<CalendarEvent[]>([]);
+  const [creatingTaskFor, setCreatingTaskFor] = useState<string | null>(null);
+  const focusStorageKey = user?.id ? "parlo-focus-time-" + user.id : null;
+  const [focusState, setFocusState] = useState<StoredFocusState>(() => readFocusState(user?.id));
+  const [focusNow, setFocusNow] = useState(() => Date.now());
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [versioningFileId, setVersioningFileId] = useState<string | null>(null);
@@ -166,6 +210,21 @@ export default function ProjectDetail() {
     setBillingLoading(false);
   }
 
+  useEffect(() => {
+    if (!focusStorageKey) return;
+    try {
+      window.localStorage.setItem(focusStorageKey, JSON.stringify(focusState));
+    } catch {
+      // Focus tracking stays usable for this session when local storage is unavailable.
+    }
+  }, [focusState, focusStorageKey]);
+
+  useEffect(() => {
+    if (!focusState.active?.startedAt) return;
+    const interval = window.setInterval(() => setFocusNow(Date.now()), 1000);
+    return () => window.clearInterval(interval);
+  }, [focusState.active?.startedAt]);
+
   async function loadAll() {
     if (!projectId) return;
     setLoading(true);
@@ -174,6 +233,7 @@ export default function ProjectDetail() {
        fileResult,
       { data: a },
       { data: inv },
+      { data: taskRows },
     ] = await Promise.all([
       supabase.from("projects").select("*").eq("id", projectId).single(),
       loadProjectFiles(projectId),
@@ -188,6 +248,13 @@ export default function ProjectDetail() {
         .select("*")
         .eq("project_id", projectId)
         .order("created_at", { ascending: false }),
+      supabase
+        .from("calendar_events")
+        .select("*")
+        .eq("project_id", projectId)
+        .eq("event_type", "task")
+        .is("completed_at", null)
+        .order("event_date", { ascending: true }),
     ]);
     if (pErr) {
       toast({
@@ -210,6 +277,7 @@ export default function ProjectDetail() {
     setLegacyFileSchema(fileResult.usedLegacySchema);
     setActivity((a ?? []) as ActivityLog[]);
     setInvoices((inv ?? []) as Invoice[]);
+    setProjectTasks((taskRows ?? []) as CalendarEvent[]);
     setLoading(false);
   }
 
@@ -270,6 +338,42 @@ export default function ProjectDetail() {
     return map;
   }, [activity]);
 
+  const activeFocusForProject = project && focusState.active?.projectId === project.id ? focusState.active : null;
+  const focusRunningElsewhere = focusState.active && !activeFocusForProject ? focusState.active : null;
+  const currentFocusElapsed = activeFocusForProject
+    ? activeFocusForProject.elapsedMs + (activeFocusForProject.startedAt ? focusNow - activeFocusForProject.startedAt : 0)
+    : 0;
+
+  async function createFeedbackTask(file: ProjectFile) {
+    if (!user || !project || !file.feedback?.trim()) return;
+    const title = feedbackTaskTitle(file.file_name);
+    const description = file.feedback.trim();
+    if (projectTasks.some((task) => task.title === title && task.description === description)) {
+      toast({ title: "Already in Today", description: "This feedback is already saved as a task." });
+      return;
+    }
+    setCreatingTaskFor(file.id);
+    const { data, error } = await supabase
+      .from("calendar_events")
+      .insert({
+        user_id: user.id,
+        project_id: project.id,
+        title,
+        description,
+        event_type: "task",
+        event_date: localDateKey(),
+      })
+      .select("*")
+      .single();
+    setCreatingTaskFor(null);
+    if (error) {
+      toast({ title: "Couldn't add task", description: error.message, variant: "destructive" });
+      return;
+    }
+    setProjectTasks((tasks) => [data as CalendarEvent, ...tasks]);
+    toast({ title: "Added to Today", description: "The feedback is now a task linked to this project." });
+  }
+
   async function handleCreateInvoice(e: React.FormEvent) {
     e.preventDefault();
     if (!project) return;
@@ -297,6 +401,37 @@ export default function ProjectDetail() {
     toast({ title: "Invoice created and shared with client" });
     setInvoiceOpen(false);
     loadAll();
+  }
+
+  function startOrResumeFocus() {
+    if (!project) return;
+    const now = Date.now();
+    setFocusState((current) => {
+      if (current.active?.projectId === project.id) {
+        return { ...current, active: { ...current.active, startedAt: current.active.startedAt ?? now } };
+      }
+      if (current.active) return current;
+      return { ...current, active: { projectId: project.id, projectName: project.name, startedAt: now, elapsedMs: 0 } };
+    });
+  }
+
+  function pauseFocus() {
+    setFocusState((current) => {
+      const active = current.active;
+      if (!active || active.projectId !== project?.id || active.startedAt === null) return current;
+      return { ...current, active: { ...active, startedAt: null, elapsedMs: active.elapsedMs + Date.now() - active.startedAt } };
+    });
+  }
+
+  function finishFocus() {
+    const active = focusState.active;
+    if (!active || active.projectId !== project?.id) return;
+    const elapsedMs = active.elapsedMs + (active.startedAt ? Date.now() - active.startedAt : 0);
+    setFocusState((current) => ({
+      active: null,
+      totals: { ...current.totals, [active.projectId]: (current.totals[active.projectId] ?? 0) + elapsedMs },
+    }));
+    toast({ title: "Focus session saved", description: formatFocusDuration(elapsedMs) + " added to this project on this device." });
   }
 
   async function markInvoicePaid(inv: Invoice) {
@@ -1384,6 +1519,40 @@ export default function ProjectDetail() {
           </CardContent>
         </Card>
 
+        {project && (
+          <Card className="mb-5 border-primary/15">
+            <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+              <div className="flex min-w-0 items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><Timer className="h-5 w-5" /></div>
+                <div className="min-w-0">
+                  <div className="font-semibold">Focus session</div>
+                  <p className="mt-0.5 text-sm text-muted-foreground">Track time you choose to spend on this project.</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Saved in this browser on this device.</p>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-5">
+                <div><div className="text-xs text-muted-foreground">Tracked here</div><div className="font-mono text-lg font-semibold">{formatFocusDuration((focusState.totals[project.id] ?? 0) + currentFocusElapsed)}</div></div>
+                {activeFocusForProject && <div><div className="text-xs text-muted-foreground">Current session</div><div className="font-mono text-lg font-semibold text-primary">{formatFocusDuration(currentFocusElapsed)}</div></div>}
+                <div className="flex items-center gap-2">
+                  {activeFocusForProject ? (
+                    <>
+                      <Button type="button" size="sm" variant="outline" onClick={activeFocusForProject.startedAt ? pauseFocus : startOrResumeFocus}>
+                        {activeFocusForProject.startedAt ? <Pause className="mr-1.5 h-4 w-4" /> : <Play className="mr-1.5 h-4 w-4" />}
+                        {activeFocusForProject.startedAt ? "Pause" : "Resume"}
+                      </Button>
+                      <Button type="button" size="sm" variant="ghost" onClick={finishFocus}><Square className="mr-1.5 h-3.5 w-3.5" />Finish</Button>
+                    </>
+                  ) : focusRunningElsewhere ? (
+                    <span className="max-w-48 text-xs text-muted-foreground">Timer running for {focusRunningElsewhere.projectName}</span>
+                  ) : (
+                    <Button type="button" size="sm" onClick={startOrResumeFocus}><Play className="mr-1.5 h-4 w-4" />Start focus</Button>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {legacyFileSchema && (
           <Card className="mb-4 border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/20">
             <CardContent className="py-3.5">
@@ -1515,6 +1684,21 @@ export default function ProjectDetail() {
                             <p className="text-sm leading-relaxed text-foreground">
                               {f.feedback}
                             </p>
+                            <div className="mt-3 flex justify-end">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => void createFeedbackTask(f)}
+                                disabled={creatingTaskFor === f.id}
+                                data-testid={"button-feedback-task-" + f.id}
+                              >
+                                <ListTodo className="mr-1.5 h-4 w-4" />
+                                {projectTasks.some((task) => task.title === feedbackTaskTitle(f.file_name) && task.description === f.feedback)
+                                  ? "Added to Today"
+                                  : creatingTaskFor === f.id ? "Adding…" : "Turn into task"}
+                              </Button>
+                            </div>
                           </div>
                         )}
                       </div>
