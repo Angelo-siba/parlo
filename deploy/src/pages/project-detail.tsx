@@ -26,6 +26,7 @@ import {
   ListTodo,
 } from "lucide-react";
 import { Header } from "@/components/Header";
+import { ProjectAvatar } from "@/components/ProjectAvatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -965,6 +966,7 @@ export default function ProjectDetail() {
         <div className="flex items-start justify-between flex-wrap gap-4 mb-2">
           <div>
             <div className="flex items-center gap-3 flex-wrap">
+              <ProjectAvatar projectId={project.id} name={project.name} size="lg" />
               <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight break-words">
                 {project.name}
               </h1>
