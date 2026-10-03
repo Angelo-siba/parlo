@@ -25,6 +25,7 @@ import {
   Check,
 } from "lucide-react";
 import { Header } from "@/components/Header";
+import { ProjectAvatar } from "@/components/ProjectAvatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -130,6 +131,7 @@ export default function Dashboard() {
   const [clientName, setClientName] = useState("");
   const [clientEmail, setClientEmail] = useState("");
   const [projectSearch, setProjectSearch] = useState("");
+  const [projectView, setProjectView] = useState<"all" | ProjectStatus>("all");
   const [onboardingDismissed, setOnboardingDismissed] = useState(false);
   const [portalLinkCopied, setPortalLinkCopied] = useState(false);
   const [limitDialogOpen, setLimitDialogOpen] = useState(false);
@@ -687,26 +689,12 @@ export default function Dashboard() {
           project.client_name.toLowerCase().includes(normalizedProjectSearch),
       )
     : projects;
-  const projectGroups = [
-    {
-      status: "active" as const,
-      label: "Active",
-      projects: visibleProjects.filter((project) => project.status === "active"),
-    },
-    {
-      status: "draft" as const,
-      label: "Draft",
-      projects: visibleProjects.filter((project) => project.status === "draft"),
-    },
-    {
-      status: "completed" as const,
-      label: "Completed",
-      projects: visibleProjects.filter(
-        (project) =>
-          project.status === "completed" || project.status === "archived",
-      ),
-    },
-  ].filter((group) => group.projects.length > 0);
+  const projectsInView = projectView === "all"
+    ? visibleProjects
+    : visibleProjects.filter((project) => project.status === projectView);
+  const recentProjects = [...projects]
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .slice(0, 8);
   const dashboardGreeting = getDashboardGreeting(preferredName);
   const workspaceMessage = getWorkspaceMessage(
     loading,
@@ -1245,7 +1233,7 @@ export default function Dashboard() {
               </div>
             </CardContent>
           </Card>
-        ) : visibleProjects.length === 0 ? (
+        ) : projectsInView.length === 0 ? (
           <Card className="border-dashed">
             <CardContent className="py-12 text-center">
               <Search className="h-8 w-8 mx-auto text-muted-foreground mb-3" />
@@ -1263,62 +1251,112 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-8">
-            {projectGroups.map((group) => (
-              <section key={group.status}>
-                <div className="flex items-center gap-2 mb-3">
-                  <h2 className="text-sm font-semibold">{group.label}</h2>
-                  <Badge variant="secondary">{group.projects.length}</Badge>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {group.projects.map((p) => (
-                    <Link
-                      key={p.id}
-                      href={"/projects/" + p.id}
-                      data-testid={"link-project-" + p.id}
+          <div className="grid items-start gap-5 lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-7">
+            <aside className="rounded-xl border border-border bg-card p-3.5 lg:sticky lg:top-24">
+              <div className="mb-2 px-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Project views</div>
+              <nav className="flex flex-wrap gap-1 lg:flex-col" aria-label="Project views">
+                {(["all", ...PROJECT_STATUSES.map((status) => status.value)] as ("all" | ProjectStatus)[]).map((view) => {
+                  const label = view === "all" ? "All projects" : PROJECT_STATUSES.find((status) => status.value === view)?.label ?? view;
+                  const count = view === "all" ? projects.length : projects.filter((project) => project.status === view).length;
+                  return (
+                    <button
+                      key={view}
+                      type="button"
+                      onClick={() => setProjectView(view)}
+                      aria-current={projectView === view ? "page" : undefined}
+                      className={`flex min-h-9 flex-1 items-center justify-between gap-3 rounded-lg px-2.5 text-left text-sm transition-colors lg:flex-none ${projectView === view ? "bg-primary/10 font-medium text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
                     >
-                      <Card className="hover-elevate cursor-pointer h-full transition-colors hover:border-primary/30">
-                        <CardHeader>
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex items-center gap-2 flex-wrap min-w-0">
-                              <CardTitle className="text-lg">{p.name}</CardTitle>
-                              <StatusBadge status={p.status} />
-                            </div>
-                            {p.pendingCount > 0 ? (
-                              <Badge
-                                variant="secondary"
-                                className="bg-primary/10 text-primary border-primary/20 shrink-0"
-                              >
-                                {p.pendingCount} pending
-                              </Badge>
-                            ) : p.fileCount > 0 ? (
-                              <Badge variant="outline" className="shrink-0">All approved</Badge>
-                            ) : (
-                              <Badge variant="outline" className="shrink-0">No files</Badge>
-                            )}
-                          </div>
-                        </CardHeader>
-                        <CardContent className="space-y-2 text-sm">
-                          <div className="flex items-center gap-2 text-muted-foreground">
-                            <Mail className="h-3.5 w-3.5" />
-                            {p.client_name} · {p.client_email}
-                          </div>
-                          <div className="flex items-center gap-2 text-muted-foreground">
-                            <Clock className="h-3.5 w-3.5" />
-                            Created{" "}
-                            {format(new Date(p.created_at), "MMM d, yyyy")}
-                          </div>
-                          <div className="mt-4 flex items-center justify-between border-t border-border/60 pt-3 text-sm">
-                            <span className="font-medium text-foreground">Open project</span>
-                            <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </Link>
-                  ))}
+                      <span className="flex items-center gap-2"><FolderOpen className="h-4 w-4" />{label}</span>
+                      <span className="text-xs tabular-nums">{count}</span>
+                    </button>
+                  );
+                })}
+              </nav>
+
+              <div className="mt-4 hidden border-t border-border/70 pt-4 lg:block">
+                <div className="mb-2 px-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Recent projects</div>
+                {recentProjects.length > 0 ? (
+                  <div className="space-y-0.5">
+                    {recentProjects.map((project) => (
+                      <Link
+                        key={project.id}
+                        href={`/projects/${project.id}`}
+                        title={project.name}
+                        className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                      >
+                        <ProjectAvatar projectId={project.id} name={project.name} size="sm" />
+                        <span className="min-w-0 truncate">{project.name}</span>
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="px-2 py-2 text-xs text-muted-foreground">Your recent projects will appear here.</p>
+                )}
+              </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mt-4 hidden w-full lg:flex"
+                onClick={() => {
+                  if (!isPro && activeProjectCount >= FREE_PROJECT_LIMIT) setLimitDialogOpen(true);
+                  else setOpen(true);
+                }}
+                data-testid="button-sidebar-new-project"
+              >
+                <Plus className="mr-2 h-4 w-4" />New project
+              </Button>
+            </aside>
+
+            <section className="min-w-0 overflow-hidden rounded-xl border border-border bg-card">
+              <div className="flex flex-wrap items-end justify-between gap-3 border-b border-border/70 px-4 py-4 sm:px-5">
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">{projectView === "all" ? "Your workspace" : labelForProjectView(projectView)}</p>
+                  <h2 className="mt-1 text-lg font-semibold tracking-tight text-foreground">{projectView === "all" ? "Projects" : labelForProjectView(projectView)}</h2>
                 </div>
-              </section>
-            ))}
+                <span className="text-xs text-muted-foreground">{projectsInView.length} {projectsInView.length === 1 ? "project" : "projects"}</span>
+              </div>
+
+              <div className="hidden grid-cols-[minmax(0,1.5fr)_minmax(130px,1fr)_110px_minmax(150px,1fr)] gap-4 border-b border-border/70 bg-muted/30 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground md:grid md:px-5">
+                <span>Project name</span><span>Client</span><span>Status</span><span>Review</span>
+              </div>
+
+              <div className="divide-y divide-border/70">
+                {projectsInView.map((p) => (
+                  <Link
+                    key={p.id}
+                    href={`/projects/${p.id}`}
+                    data-testid={`link-project-${p.id}`}
+                    aria-label={`Open ${p.name}, project for ${p.client_name}`}
+                    className="block px-4 py-3 transition-colors hover:bg-muted/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:px-5"
+                  >
+                    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 md:grid-cols-[minmax(0,1.5fr)_minmax(130px,1fr)_110px_minmax(150px,1fr)] md:gap-4">
+                      <div className="col-span-2 flex min-w-0 items-center gap-3 md:col-span-1">
+                        <ProjectAvatar projectId={p.id} name={p.name} size="md" />
+                        <span className="min-w-0 truncate text-sm font-medium text-foreground">{p.name}</span>
+                        <ArrowUpRight className="ml-auto h-4 w-4 shrink-0 text-muted-foreground md:hidden" />
+                      </div>
+                      <div className="min-w-0 pl-12 md:pl-0">
+                        <p className="truncate text-sm text-foreground">{p.client_name}</p>
+                        <p className="truncate text-xs text-muted-foreground">{p.client_email}</p>
+                      </div>
+                      <div className="justify-self-end md:justify-self-start"><StatusBadge status={p.status} /></div>
+                      <div className="col-span-2 min-w-0 pl-12 text-xs text-muted-foreground md:col-span-1 md:pl-0">
+                        {p.pendingCount > 0 ? (
+                          <span className="font-medium text-primary">{p.pendingCount} awaiting review</span>
+                        ) : p.fileCount > 0 ? (
+                          <span className="text-emerald-700 dark:text-emerald-400">All files approved</span>
+                        ) : (
+                          <span>No files yet</span>
+                        )}
+                        {p.changesRequestedCount > 0 && <span className="ml-2 text-amber-700 dark:text-amber-400">· {p.changesRequestedCount} changes requested</span>}
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </section>
           </div>
         )}
       </main>
@@ -1332,6 +1370,11 @@ const STATUS_STYLES: Record<ProjectStatus, string> = {
   completed: "bg-emerald-50 text-emerald-700 border-emerald-200",
   archived:  "bg-muted text-muted-foreground border-border",
 };
+
+function labelForProjectView(view: "all" | ProjectStatus) {
+  if (view === "all") return "All projects";
+  return PROJECT_STATUSES.find((status) => status.value === view)?.label ?? view;
+}
 
 function StatusBadge({ status }: { status: ProjectStatus }) {
   const label = PROJECT_STATUSES.find((s) => s.value === status)?.label ?? status;
