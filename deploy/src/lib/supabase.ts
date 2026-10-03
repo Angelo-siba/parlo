@@ -191,6 +191,13 @@ export type CalendarEvent = {
   updated_at: string;
 };
 
+export type ProjectNote = {
+  project_id: string;
+  user_id: string;
+  content: string;
+  updated_at: string;
+};
+
 export type FreelancerSettings = {
   user_id: string;
   display_name: string | null;
