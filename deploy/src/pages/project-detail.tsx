@@ -24,10 +24,7 @@ import {
   Pencil,
   Archive,
   ListTodo,
-  Timer,
-  Play,
-  Pause,
-  Square,
+  BookOpen,
 } from "lucide-react";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
@@ -70,31 +67,6 @@ import {
 
 const MAX_FILE_SIZE_MB = 50;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
-
-type StoredFocusState = {
-  active: { projectId: string; projectName: string; startedAt: number | null; elapsedMs: number } | null;
-  totals: Record<string, number>;
-};
-
-function readFocusState(userId?: string | null): StoredFocusState {
-  if (!userId || typeof window === "undefined") return { active: null, totals: {} };
-  try {
-    const saved = window.localStorage.getItem("parlo-focus-time-" + userId);
-    if (!saved) return { active: null, totals: {} };
-    const parsed = JSON.parse(saved) as StoredFocusState;
-    return { active: parsed.active ?? null, totals: parsed.totals ?? {} };
-  } catch {
-    return { active: null, totals: {} };
-  }
-}
-
-function formatFocusDuration(milliseconds: number) {
-  const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000));
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  return [hours, minutes, seconds].map((part) => String(part).padStart(2, "0")).join(":");
-}
 
 function localDateKey(date = new Date()) {
   return date.getFullYear() + "-" + String(date.getMonth() + 1).padStart(2, "0") + "-" + String(date.getDate()).padStart(2, "0");
@@ -156,9 +128,11 @@ export default function ProjectDetail() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [projectTasks, setProjectTasks] = useState<CalendarEvent[]>([]);
   const [creatingTaskFor, setCreatingTaskFor] = useState<string | null>(null);
-  const focusStorageKey = user?.id ? "parlo-focus-time-" + user.id : null;
-  const [focusState, setFocusState] = useState<StoredFocusState>(() => readFocusState(user?.id));
-  const [focusNow, setFocusNow] = useState(() => Date.now());
+  const [projectNote, setProjectNote] = useState("");
+  const [notesLoaded, setNotesLoaded] = useState(false);
+  const [noteStatus, setNoteStatus] = useState<"saved" | "unsaved" | "saving" | "error">("saved");
+  const [noteSavedAt, setNoteSavedAt] = useState<string | null>(null);
+  const noteDraftRef = useRef("");
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [versioningFileId, setVersioningFileId] = useState<string | null>(null);
@@ -211,29 +185,40 @@ export default function ProjectDetail() {
   }
 
   useEffect(() => {
-    if (!focusStorageKey) return;
-    try {
-      window.localStorage.setItem(focusStorageKey, JSON.stringify(focusState));
-    } catch {
-      // Focus tracking stays usable for this session when local storage is unavailable.
-    }
-  }, [focusState, focusStorageKey]);
-
-  useEffect(() => {
-    if (!focusState.active?.startedAt) return;
-    const interval = window.setInterval(() => setFocusNow(Date.now()), 1000);
-    return () => window.clearInterval(interval);
-  }, [focusState.active?.startedAt]);
+    if (!notesLoaded || noteStatus !== "unsaved" || !project || !user) return;
+    const content = projectNote;
+    const timeout = window.setTimeout(async () => {
+      setNoteStatus("saving");
+      const { error } = await supabase.from("project_notes").upsert(
+        { project_id: project.id, user_id: user.id, content },
+        { onConflict: "project_id" },
+      );
+      if (error) {
+        if (noteDraftRef.current === content) {
+          setNoteStatus("error");
+          toast({ title: "Couldn't save notebook", description: error.message, variant: "destructive" });
+        } else {
+          setNoteStatus("unsaved");
+        }
+        return;
+      }
+      setNoteSavedAt(new Date().toISOString());
+      setNoteStatus(noteDraftRef.current === content ? "saved" : "unsaved");
+    }, 700);
+    return () => window.clearTimeout(timeout);
+  }, [projectNote, noteStatus, notesLoaded, project?.id, user?.id, toast]);
 
   async function loadAll() {
     if (!projectId) return;
     setLoading(true);
+    setNotesLoaded(false);
     const [
       { data: p, error: pErr },
        fileResult,
       { data: a },
       { data: inv },
       { data: taskRows },
+      { data: noteRow, error: noteError },
     ] = await Promise.all([
       supabase.from("projects").select("*").eq("id", projectId).single(),
       loadProjectFiles(projectId),
@@ -255,6 +240,11 @@ export default function ProjectDetail() {
         .eq("event_type", "task")
         .is("completed_at", null)
         .order("event_date", { ascending: true }),
+      supabase
+        .from("project_notes")
+        .select("content, updated_at")
+        .eq("project_id", projectId)
+        .maybeSingle(),
     ]);
     if (pErr) {
       toast({
@@ -278,6 +268,17 @@ export default function ProjectDetail() {
     setActivity((a ?? []) as ActivityLog[]);
     setInvoices((inv ?? []) as Invoice[]);
     setProjectTasks((taskRows ?? []) as CalendarEvent[]);
+    if (noteError) {
+      toast({ title: "Couldn't load project notebook", description: noteError.message, variant: "destructive" });
+      setNotesLoaded(false);
+    } else {
+      const content = noteRow?.content ?? "";
+      noteDraftRef.current = content;
+      setProjectNote(content);
+      setNoteSavedAt(noteRow?.updated_at ?? null);
+      setNoteStatus("saved");
+      setNotesLoaded(true);
+    }
     setLoading(false);
   }
 
@@ -338,12 +339,6 @@ export default function ProjectDetail() {
     return map;
   }, [activity]);
 
-  const activeFocusForProject = project && focusState.active?.projectId === project.id ? focusState.active : null;
-  const focusRunningElsewhere = focusState.active && !activeFocusForProject ? focusState.active : null;
-  const currentFocusElapsed = activeFocusForProject
-    ? activeFocusForProject.elapsedMs + (activeFocusForProject.startedAt ? focusNow - activeFocusForProject.startedAt : 0)
-    : 0;
-
   async function createFeedbackTask(file: ProjectFile) {
     if (!user || !project || !file.feedback?.trim()) return;
     const title = feedbackTaskTitle(file.file_name);
@@ -401,37 +396,6 @@ export default function ProjectDetail() {
     toast({ title: "Invoice created and shared with client" });
     setInvoiceOpen(false);
     loadAll();
-  }
-
-  function startOrResumeFocus() {
-    if (!project) return;
-    const now = Date.now();
-    setFocusState((current) => {
-      if (current.active?.projectId === project.id) {
-        return { ...current, active: { ...current.active, startedAt: current.active.startedAt ?? now } };
-      }
-      if (current.active) return current;
-      return { ...current, active: { projectId: project.id, projectName: project.name, startedAt: now, elapsedMs: 0 } };
-    });
-  }
-
-  function pauseFocus() {
-    setFocusState((current) => {
-      const active = current.active;
-      if (!active || active.projectId !== project?.id || active.startedAt === null) return current;
-      return { ...current, active: { ...active, startedAt: null, elapsedMs: active.elapsedMs + Date.now() - active.startedAt } };
-    });
-  }
-
-  function finishFocus() {
-    const active = focusState.active;
-    if (!active || active.projectId !== project?.id) return;
-    const elapsedMs = active.elapsedMs + (active.startedAt ? Date.now() - active.startedAt : 0);
-    setFocusState((current) => ({
-      active: null,
-      totals: { ...current.totals, [active.projectId]: (current.totals[active.projectId] ?? 0) + elapsedMs },
-    }));
-    toast({ title: "Focus session saved", description: formatFocusDuration(elapsedMs) + " added to this project on this device." });
   }
 
   async function markInvoicePaid(inv: Invoice) {
@@ -1520,33 +1484,46 @@ export default function ProjectDetail() {
         </Card>
 
         {project && (
-          <Card className="mb-5 border-primary/15">
-            <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
-              <div className="flex min-w-0 items-start gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><Timer className="h-5 w-5" /></div>
-                <div className="min-w-0">
-                  <div className="font-semibold">Focus session</div>
-                  <p className="mt-0.5 text-sm text-muted-foreground">Track time you choose to spend on this project.</p>
-                  <p className="mt-1 text-xs text-muted-foreground">Saved in this browser on this device.</p>
+          <Card className="mb-5 overflow-hidden border-primary/15">
+            <CardContent className="p-5 sm:p-6">
+              <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><BookOpen className="h-5 w-5" /></div>
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className="font-semibold">Project notebook</h2>
+                      <Badge variant="secondary" className={noteStatus === "error" ? "bg-destructive/10 text-destructive" : ""}>
+                        {noteStatus === "saving" ? "Saving…" : noteStatus === "unsaved" ? "Unsaved" : noteStatus === "error" ? "Save failed" : "Saved"}
+                      </Badge>
+                    </div>
+                    <p className="mt-1 text-sm text-muted-foreground">Private notes for decisions, reminders, and next steps.</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground sm:pt-1">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                  Autosaves to this project
                 </div>
               </div>
-              <div className="flex flex-wrap items-center gap-5">
-                <div><div className="text-xs text-muted-foreground">Tracked here</div><div className="font-mono text-lg font-semibold">{formatFocusDuration((focusState.totals[project.id] ?? 0) + currentFocusElapsed)}</div></div>
-                {activeFocusForProject && <div><div className="text-xs text-muted-foreground">Current session</div><div className="font-mono text-lg font-semibold text-primary">{formatFocusDuration(currentFocusElapsed)}</div></div>}
-                <div className="flex items-center gap-2">
-                  {activeFocusForProject ? (
-                    <>
-                      <Button type="button" size="sm" variant="outline" onClick={activeFocusForProject.startedAt ? pauseFocus : startOrResumeFocus}>
-                        {activeFocusForProject.startedAt ? <Pause className="mr-1.5 h-4 w-4" /> : <Play className="mr-1.5 h-4 w-4" />}
-                        {activeFocusForProject.startedAt ? "Pause" : "Resume"}
-                      </Button>
-                      <Button type="button" size="sm" variant="ghost" onClick={finishFocus}><Square className="mr-1.5 h-3.5 w-3.5" />Finish</Button>
-                    </>
-                  ) : focusRunningElsewhere ? (
-                    <span className="max-w-48 text-xs text-muted-foreground">Timer running for {focusRunningElsewhere.projectName}</span>
-                  ) : (
-                    <Button type="button" size="sm" onClick={startOrResumeFocus}><Play className="mr-1.5 h-4 w-4" />Start focus</Button>
-                  )}
+              <Textarea
+                value={projectNote}
+                onChange={(event) => {
+                  noteDraftRef.current = event.target.value;
+                  setProjectNote(event.target.value);
+                  setNoteStatus("unsaved");
+                }}
+                placeholder="Capture a decision, a client follow-up, or the next thing to tackle…"
+                maxLength={20000}
+                disabled={!notesLoaded}
+                className="min-h-[180px] resize-y rounded-xl border-border/70 bg-background/80 leading-relaxed shadow-sm placeholder:text-muted-foreground/70 focus-visible:ring-primary/25"
+                aria-label="Private project notebook"
+                data-testid="textarea-project-notebook"
+              />
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+                <span>Only you can see these notes.</span>
+                <div className="flex items-center gap-3">
+                  {noteStatus === "error" && <Button type="button" variant="ghost" size="sm" className="h-7 px-2" onClick={() => setNoteStatus("unsaved")}>Retry save</Button>}
+                  <span>{projectNote.length.toLocaleString()} / 20,000</span>
+                  {noteStatus === "saved" && noteSavedAt && <span>Saved {formatDistanceToNow(new Date(noteSavedAt), { addSuffix: true })}</span>}
                 </div>
               </div>
             </CardContent>
