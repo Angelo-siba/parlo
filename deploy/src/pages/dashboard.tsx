@@ -153,11 +153,23 @@ export default function Dashboard() {
   async function loadProjects() {
     if (!user) return;
     setLoading(true);
-    const { data: projectsData, error } = await supabase
-      .from("projects")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false });
+    const [projectsResult, filesResult, tasksResult] = await Promise.all([
+      supabase
+        .from("projects")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false }),
+      loadAllProjectFiles(),
+      supabase
+        .from("calendar_events")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("event_type", "task")
+        .is("completed_at", null)
+        .lte("event_date", localDateKey())
+        .order("event_date", { ascending: true }),
+    ]);
+    const { data: projectsData, error } = projectsResult;
 
     if (error) {
       toast({
@@ -170,7 +182,7 @@ export default function Dashboard() {
       return;
     }
 
-    const { data: filesData } = await loadAllProjectFiles();
+    const { data: filesData } = filesResult;
 
     const stats = new Map<
       string,
@@ -215,16 +227,7 @@ export default function Dashboard() {
       }),
     }));
     setProjects(projectList);
-
-    const { data: openTasks } = await supabase
-      .from("calendar_events")
-      .select("*")
-      .eq("user_id", user.id)
-      .eq("event_type", "task")
-      .is("completed_at", null)
-      .lte("event_date", localDateKey())
-      .order("event_date", { ascending: true });
-    setCalendarTasks((openTasks ?? []) as CalendarEvent[]);
+    setCalendarTasks((tasksResult.data ?? []) as CalendarEvent[]);
 
     // Keep invoice reminders on the dashboard; full tracking lives in Revenue.
     if (projectList.length > 0) {
