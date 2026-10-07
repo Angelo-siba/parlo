@@ -663,9 +663,6 @@ export default function Dashboard() {
   const projectsInView = projectView === "all"
     ? visibleProjects
     : visibleProjects.filter((project) => project.status === projectView);
-  const recentProjects = [...projects]
-    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-    .slice(0, 8);
   const dashboardGreeting = getDashboardGreeting(preferredName);
   const workspaceMessage = getWorkspaceMessage(
     loading,
@@ -871,7 +868,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {!loading && !onboardingDismissed && (
+        {!loading && projects.length > 0 && !onboardingDismissed && (
           <div className="mb-6">
             <OnboardingChecklist
               steps={onboardingSteps}
@@ -1098,12 +1095,7 @@ export default function Dashboard() {
         </Dialog>
 
         {projects.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
-            <StatCard
-              icon={<FolderOpen className="h-5 w-5" />}
-              label="Active projects"
-              value={activeProjectCount}
-            />
+          <div className="grid grid-cols-1 gap-3 mb-6 sm:grid-cols-2">
             <StatCard
               icon={<Clock className="h-5 w-5" />}
               label="Pending approvals"
@@ -1237,47 +1229,12 @@ export default function Dashboard() {
                 })}
               </nav>
 
-              <div className="mt-4 hidden border-t border-border/70 pt-4 lg:block">
-                <div className="mb-2 px-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Recent projects</div>
-                {recentProjects.length > 0 ? (
-                  <div className="space-y-0.5">
-                    {recentProjects.map((project) => (
-                      <Link
-                        key={project.id}
-                        href={`/projects/${project.id}`}
-                        title={project.name}
-                        className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                      >
-                        <ProjectAvatar projectId={project.id} name={project.name} size="sm" />
-                        <span className="min-w-0 truncate">{project.name}</span>
-                      </Link>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="px-2 py-2 text-xs text-muted-foreground">Your recent projects will appear here.</p>
-                )}
-              </div>
-
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="mt-4 hidden w-full lg:flex"
-                onClick={() => {
-                  if (!isPro && activeProjectCount >= FREE_PROJECT_LIMIT) setLimitDialogOpen(true);
-                  else setOpen(true);
-                }}
-                data-testid="button-sidebar-new-project"
-              >
-                <Plus className="mr-2 h-4 w-4" />New project
-              </Button>
             </aside>
 
             <section className="min-w-0 overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
               <div className="flex flex-wrap items-end justify-between gap-3 border-b border-border/70 px-4 py-4 sm:px-5">
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground">{projectView === "all" ? "Your workspace" : labelForProjectView(projectView)}</p>
-                  <h2 className="mt-1 text-lg font-semibold tracking-tight text-foreground">{projectView === "all" ? "Projects" : labelForProjectView(projectView)}</h2>
+                  <h2 className="text-lg font-semibold tracking-tight text-foreground">{projectView === "all" ? "Projects" : labelForProjectView(projectView)}</h2>
                 </div>
                 <span className="text-xs text-muted-foreground">{projectsInView.length} {projectsInView.length === 1 ? "project" : "projects"}</span>
               </div>
