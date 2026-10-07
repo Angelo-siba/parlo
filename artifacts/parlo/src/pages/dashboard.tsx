@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { differenceInCalendarDays, format, parseISO, startOfDay, startOfMonth, endOfMonth } from "date-fns";
+import { differenceInCalendarDays, format, parseISO, startOfDay } from "date-fns";
 import {
   ArrowRight,
   CalendarDays,
@@ -16,9 +16,7 @@ import {
   Moon,
   Sun,
   Search,
-  DollarSign,
-  TrendingUp,
-  Hourglass,
+  X,
   Upload,
 } from "lucide-react";
 import { Header } from "@/components/Header";
@@ -115,11 +113,6 @@ export default function Dashboard() {
   const [portalLinkCopied, setPortalLinkCopied] = useState(false);
   const { toast } = useToast();
 
-  // Revenue
-  const [totalRevenue, setTotalRevenue] = useState(0);
-  const [outstanding, setOutstanding] = useState(0);
-  const [thisMonthRevenue, setThisMonthRevenue] = useState(0);
-
   // Settings
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
@@ -201,7 +194,7 @@ export default function Dashboard() {
     }));
     setProjects(projectList);
 
-    // Fetch invoices for revenue stats
+    // Keep invoice reminders on the dashboard; full tracking lives in Revenue.
     if (projectList.length > 0) {
       const ids = projectList.map((p: Project) => p.id);
       const { data: invoices } = await supabase
@@ -210,32 +203,8 @@ export default function Dashboard() {
         .in("project_id", ids);
 
       setInvoices((invoices ?? []) as Invoice[]);
-      if (invoices) {
-        const now = new Date();
-        const monthStart = startOfMonth(now).toISOString();
-        const monthEnd = endOfMonth(now).toISOString();
-        let rev = 0;
-        let out = 0;
-        let monthRev = 0;
-        (invoices as Pick<Invoice, "total_amount" | "status" | "created_at">[]).forEach((inv) => {
-          if (inv.status === "paid") {
-            rev += inv.total_amount;
-            if (inv.created_at >= monthStart && inv.created_at <= monthEnd) {
-              monthRev += inv.total_amount;
-            }
-          } else if (inv.status === "sent") {
-            out += inv.total_amount;
-          }
-        });
-        setTotalRevenue(rev);
-        setOutstanding(out);
-        setThisMonthRevenue(monthRev);
-      }
     } else {
       setInvoices([]);
-      setTotalRevenue(0);
-      setOutstanding(0);
-      setThisMonthRevenue(0);
     }
     setLoading(false);
   }
@@ -558,7 +527,6 @@ export default function Dashboard() {
 
   const totalPending = projects.reduce((s, p) => s + Math.max(0, p.pendingCount - p.changesRequestedCount), 0);
   const totalApproved = projects.reduce((s, p) => s + p.approvedCount, 0);
-  const hasRevenue = totalRevenue > 0 || outstanding > 0 || thisMonthRevenue > 0;
   const normalizedProjectSearch = projectSearch.trim().toLowerCase();
   const visibleProjects = normalizedProjectSearch
     ? projects.filter(
@@ -659,17 +627,25 @@ export default function Dashboard() {
         onLogout={signOut}
         userEmail={user?.email}
       />
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        <div className="flex items-start justify-between mb-6 flex-wrap gap-3">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">
+      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+        <div className="mb-6 flex flex-wrap items-start justify-between gap-4 rounded-2xl border border-primary/15 bg-gradient-to-br from-card via-card to-primary/5 p-5 shadow-sm sm:items-center sm:p-6">
+          <div className="min-w-0">
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <span className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+                Workspace
+              </span>
+              <Badge variant="secondary" className="rounded-full">
+                {projects.length} {projects.length === 1 ? "project" : "projects"}
+              </Badge>
+            </div>
+            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
               {dashboardGreeting}
             </h1>
-            <p className="text-muted-foreground mt-1">
+            <p className="mt-1.5 max-w-xl text-sm text-muted-foreground sm:text-base">
               {workspaceMessage}
             </p>
           </div>
-          <div className="flex flex-wrap items-center justify-end gap-2">
+          <div className="flex w-full flex-wrap items-center justify-start gap-2 sm:w-auto sm:justify-end">
             <div className="relative w-full sm:w-56">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -677,9 +653,22 @@ export default function Dashboard() {
                 onChange={(event) => setProjectSearch(event.target.value)}
                 placeholder="Search projects..."
                 aria-label="Search projects"
-                className="h-9 pl-9"
+                className="h-9 pl-9 pr-10"
                 data-testid="input-project-search"
               />
+              {projectSearch && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2"
+                  onClick={() => setProjectSearch("")}
+                  aria-label="Clear project search"
+                  data-testid="button-clear-project-search-input"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
             </div>
             <Button
               variant="outline"
@@ -949,33 +938,6 @@ export default function Dashboard() {
           </DialogContent>
         </Dialog>
 
-        {/* Revenue stats */}
-        {hasRevenue && (
-          <div className="mb-6">
-            <h2 className="text-sm font-semibold text-foreground mb-3">
-              Revenue
-            </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <RevenueCard
-                icon={<DollarSign className="h-5 w-5" />}
-                label="Total revenue"
-                value={totalRevenue}
-              />
-              <RevenueCard
-                icon={<Hourglass className="h-5 w-5" />}
-                label="Outstanding"
-                value={outstanding}
-                highlight={outstanding > 0}
-              />
-              <RevenueCard
-                icon={<TrendingUp className="h-5 w-5" />}
-                label={`This month (${format(new Date(), "MMM")})`}
-                value={thisMonthRevenue}
-              />
-            </div>
-          </div>
-        )}
-
         {/* Project stats */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
           <StatCard
@@ -1050,7 +1012,7 @@ export default function Dashboard() {
                       href={`/projects/${p.id}`}
                       data-testid={`link-project-${p.id}`}
                     >
-                      <Card className="hover-elevate cursor-pointer h-full">
+                      <Card className="h-full cursor-pointer rounded-2xl border-border/70 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
                         <CardHeader>
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex items-center gap-2 flex-wrap min-w-0">
@@ -1125,7 +1087,7 @@ function StatCard({
   highlight?: boolean;
 }) {
   return (
-    <Card>
+    <Card className="rounded-2xl border-border/70 shadow-sm">
       <CardContent className="py-4 flex items-center gap-3">
         <div
           className={`h-9 w-9 rounded-lg flex items-center justify-center ${
@@ -1138,40 +1100,6 @@ function StatCard({
         </div>
         <div>
           <div className="text-xl font-semibold leading-none">{value}</div>
-          <div className="text-xs text-muted-foreground mt-1">{label}</div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function RevenueCard({
-  icon,
-  label,
-  value,
-  highlight,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: number;
-  highlight?: boolean;
-}) {
-  return (
-    <Card className={highlight ? "border-primary/30 bg-primary/5" : ""}>
-      <CardContent className="py-5 flex items-center gap-4">
-        <div
-          className={`h-10 w-10 rounded-lg flex items-center justify-center ${
-            highlight
-              ? "bg-primary/15 text-primary"
-              : "bg-muted text-muted-foreground"
-          }`}
-        >
-          {icon}
-        </div>
-        <div>
-          <div className="text-2xl font-semibold leading-none">
-            ${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </div>
           <div className="text-xs text-muted-foreground mt-1">{label}</div>
         </div>
       </CardContent>

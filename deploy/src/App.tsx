@@ -1,20 +1,35 @@
+import { lazy, Suspense } from "react";
 import { Redirect, Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/lib/auth";
-import Dashboard from "@/pages/dashboard";
-import CalendarPage from "@/pages/calendar";
-import NotebookPage from "@/pages/notebook";
-import LandingPage from "@/pages/landing";
-import PricingPage from "@/pages/pricing";
-import ProjectDetail from "@/pages/project-detail";
-import ClientPortal from "@/pages/client-portal";
-import AuthPage from "@/pages/auth";
-import ResetPasswordPage from "@/pages/reset-password";
-import NotFound from "@/pages/not-found";
+
+const Dashboard = lazy(() => import("@/pages/dashboard"));
+const CalendarPage = lazy(() => import("@/pages/calendar"));
+const NotebookPage = lazy(() => import("@/pages/notebook"));
+const RevenuePage = lazy(() => import("@/pages/revenue"));
+const LandingPage = lazy(() => import("@/pages/landing"));
+const PricingPage = lazy(() => import("@/pages/pricing"));
+const ProjectDetail = lazy(() => import("@/pages/project-detail"));
+const ClientPortal = lazy(() => import("@/pages/client-portal"));
+const AuthPage = lazy(() => import("@/pages/auth"));
+const ResetPasswordPage = lazy(() => import("@/pages/reset-password"));
+const NotFound = lazy(() => import("@/pages/not-found"));
 const queryClient = new QueryClient();
+
+function PageLoading() {
+  return (
+    <div
+      className="flex min-h-screen items-center justify-center bg-background text-muted-foreground"
+      role="status"
+      aria-live="polite"
+    >
+      Loading…
+    </div>
+  );
+}
 
 function ProtectedRouter() {
   const { user, loading, isRecovery } = useAuth();
@@ -58,6 +73,7 @@ function ProtectedRouter() {
       <Route path="/" component={Dashboard} />
       <Route path="/calendar" component={CalendarPage} />
       <Route path="/notebook" component={NotebookPage} />
+      <Route path="/revenue" component={RevenuePage} />
       <Route path="/pricing" component={PricingPage} />
       <Route path="/signup" component={AuthPage} />
       <Route path="/login" component={AuthPage} />
@@ -81,7 +97,9 @@ function App() {
         <AuthProvider>
           <TooltipProvider>
             <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-              <ProtectedRouter />
+              <Suspense fallback={<PageLoading />}>
+                <ProtectedRouter />
+              </Suspense>
             </WouterRouter>
             <Toaster />
           </TooltipProvider>
