@@ -1,5 +1,5 @@
-import { Link } from "wouter";
-import { BookOpen, CalendarDays, LogOut } from "lucide-react";
+import { Link, useLocation } from "wouter";
+import { BookOpen, CalendarDays, DollarSign, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export function Header({
@@ -18,13 +18,20 @@ export function Header({
   brandColor?: string | null;
 }) {
   const accentStyle = brandColor ? { borderBottomColor: brandColor } : {};
+  const [location] = useLocation();
+  const navClass = (active: boolean) =>
+    `inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-medium transition-colors ${
+      active
+        ? "bg-primary/10 text-primary"
+        : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+    }`;
 
   return (
     <header
       className="border-b border-border/60 bg-background/80 backdrop-blur sticky top-0 z-10"
       style={accentStyle}
     >
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
         <Link
           href="/"
           className="flex items-center gap-2 group"
@@ -59,27 +66,42 @@ export function Header({
         </Link>
 
         {onLogout && (
-          <div className="flex items-center gap-3">
-            <Link
-              href="/calendar"
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground"
-              data-testid="link-calendar"
-              aria-label="Calendar"
-              title="Calendar"
-            >
-              <CalendarDays className="h-4 w-4" />
-              <span className="hidden lg:inline">Calendar</span>
-            </Link>
-            <Link
-              href="/notebook"
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground"
-              data-testid="link-notebook"
-              aria-label="Notebook"
-              title="Notebook"
-            >
-              <BookOpen className="h-4 w-4" />
-              <span className="hidden lg:inline">Notebook</span>
-            </Link>
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+            <nav aria-label="Workspace navigation" className="flex items-center gap-0.5 rounded-xl border border-border/60 bg-card/60 p-1">
+              <Link
+                href="/calendar"
+                className={navClass(location === "/calendar")}
+                data-testid="link-calendar"
+                aria-label="Calendar"
+                aria-current={location === "/calendar" ? "page" : undefined}
+                title="Calendar"
+              >
+                <CalendarDays className="h-4 w-4" />
+                <span className="hidden lg:inline">Calendar</span>
+              </Link>
+              <Link
+                href="/notebook"
+                className={navClass(location === "/notebook")}
+                data-testid="link-notebook"
+                aria-label="Notebook"
+                aria-current={location === "/notebook" ? "page" : undefined}
+                title="Notebook"
+              >
+                <BookOpen className="h-4 w-4" />
+                <span className="hidden lg:inline">Notebook</span>
+              </Link>
+              <Link
+                href="/revenue"
+                className={navClass(location === "/revenue")}
+                data-testid="link-revenue"
+                aria-label="Revenue"
+                aria-current={location === "/revenue" ? "page" : undefined}
+                title="Revenue"
+              >
+                <DollarSign className="h-4 w-4" />
+                <span className="hidden lg:inline">Revenue</span>
+              </Link>
+            </nav>
             {userEmail && (
               <span className="text-sm text-muted-foreground hidden sm:block truncate max-w-[200px]">
                 {userEmail}
@@ -91,9 +113,10 @@ export function Header({
               onClick={onLogout}
               data-testid="button-logout"
               className="gap-2"
+              aria-label="Sign out"
             >
               <LogOut className="h-4 w-4" />
-              Sign out
+              <span className="hidden sm:inline">Sign out</span>
             </Button>
           </div>
         )}

@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from "@/lib/auth";
 import Dashboard from "@/pages/dashboard";
 import CalendarPage from "@/pages/calendar";
 import NotebookPage from "@/pages/notebook";
+import RevenuePage from "@/pages/revenue";
 import LandingPage from "@/pages/landing";
 import PricingPage from "@/pages/pricing";
 import ProjectDetail from "@/pages/project-detail";
@@ -58,6 +59,7 @@ function ProtectedRouter() {
       <Route path="/" component={Dashboard} />
       <Route path="/calendar" component={CalendarPage} />
       <Route path="/notebook" component={NotebookPage} />
+      <Route path="/revenue" component={RevenuePage} />
       <Route path="/pricing" component={PricingPage} />
       <Route path="/signup" component={AuthPage} />
       <Route path="/login" component={AuthPage} />
