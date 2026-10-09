@@ -86,10 +86,40 @@ function InvoiceMockup() {
   );
 }
 
+function TodayMockup() {
+  const rows = [
+    { action: "Review feedback", project: "Brand refresh", client: "Maya Creative", tone: "bg-[#fff1e9] text-[#d4521a]" },
+    { action: "Send for approval", project: "Product shoot", client: "Onda Studio", tone: "bg-[#e8f3e9] text-[#56815b]" },
+    { action: "Prepare for due date", project: "Logo pack", client: "Northline", tone: "bg-[#f5f0e8] text-[#77685e]" },
+  ];
+
+  return (
+    <WindowChrome title="parlo.app / today">
+      <div className="min-h-[285px] bg-[#fffdfa] p-4 text-left sm:p-5">
+        <div className="mb-4">
+          <div className="text-[8px] font-semibold uppercase tracking-[0.13em] text-[#a39287]">Today</div>
+          <div className="mt-1 text-sm font-semibold text-[#2c211b]">Next actions</div>
+        </div>
+        <div className="space-y-2.5">
+          {rows.map((row) => (
+            <div key={row.project} className="flex min-h-[56px] items-center justify-between gap-3 rounded-lg border border-[#eee4da] bg-[#fffdfa] px-3 py-2.5">
+              <div className="min-w-0">
+                <div className="truncate text-[10px] font-semibold text-[#2c211b]">{row.project}</div>
+                <div className="mt-1 truncate text-[8px] text-[#9b8e84]">{row.client}</div>
+              </div>
+              <span className={`flex-shrink-0 rounded-full px-2 py-1 text-[8px] font-semibold ${row.tone}`}>{row.action}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </WindowChrome>
+  );
+}
+
 const features = [
   { icon: FolderKanban, title: "One calm workspace", description: "Keep briefs, files, approvals, and project status together instead of stitching together five different tools.", mockup: <DashboardMockup /> },
   { icon: FileCheck2, title: "A client experience that feels premium", description: "Give clients one clean link to review files, leave feedback, approve work, and see what happens next.", mockup: <PortalMockup /> },
-  { icon: Receipt, title: "Invoices that move projects forward", description: "Send a clear invoice alongside the work and make it easy for clients to pay without another account to create.", mockup: <InvoiceMockup /> },
+  { icon: Clock3, title: "Always know what's next", description: "The Today queue turns every active project into one clear next action, so nothing sits waiting on you or your client.", mockup: <TodayMockup /> },
 ];
 
 function FeatureIcon({ icon: Icon }: { icon: React.ComponentType<{ className?: string }> }) {
@@ -170,7 +200,7 @@ export default function LandingPage() {
             <div className="max-w-xl">
               <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-[#e5cabb] bg-[#fbebe3] px-3 py-1.5 text-xs font-semibold text-[#b44819]"><Sparkles className="h-3.5 w-3.5" /> Built for the way freelancers actually work</div>
               <h1 className="max-w-xl text-5xl font-semibold leading-[1.03] tracking-[-0.055em] text-[#2c211b] sm:text-6xl lg:text-[4.5rem]">Stop chasing clients.<br /><span className="text-[#d4521a]">Start delivering.</span></h1>
-              <p className="mt-7 max-w-lg text-lg leading-8 text-[#6f6259] sm:text-xl">Parlo gives solo freelancers a simple home for projects, client reviews, approvals, and invoices—so your work feels as professional as the work itself.</p>
+              <p className="mt-7 max-w-lg text-lg leading-8 text-[#6f6259] sm:text-xl">Send one link. Your client reviews files, leaves feedback and approves. No login, no account to create.</p>
               <div className="mt-9 flex flex-col gap-3 sm:flex-row sm:items-center"><Button asChild size="lg" className="h-14 rounded-xl bg-[#d4521a] px-7 text-base font-semibold text-white shadow-[0_10px_24px_rgba(212,82,26,0.25)] hover:bg-[#b94615]"><a href="/signup">Get Started — It's Free <ArrowRight className="ml-2 h-4 w-4" /></a></Button><Button asChild size="lg" variant="outline" className="h-14 rounded-xl border-[#cdbbae] bg-transparent px-7 text-base font-semibold text-[#4f4038] hover:bg-[#fffaf5]"><a href="/pricing">See Pricing <ArrowUpRight className="ml-2 h-4 w-4" /></a></Button></div>
               <div className="mt-5 flex items-center gap-4 text-xs text-[#8e7e73]"><span className="flex items-center gap-1.5"><Check className="h-3.5 w-3.5 text-[#d4521a]" /> No credit card required</span><span className="h-1 w-1 rounded-full bg-[#c3b1a4]" /><span>Set up in 2 minutes</span></div>
             </div>

@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 
 function Logo() { return <a href="/" className="flex items-center gap-2.5"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#d4521a] text-lg font-bold text-white">P</span><span className="text-lg font-semibold tracking-tight text-[#2c211b]">Parlo</span></a>; }
 
-const freeFeatures = ["2 active projects", "Client review portal", "File approvals and feedback", "Invoices via PayPal"];
+const freeFeatures = ["2 active projects", "Client review portal", "File approvals and feedback"];
 const proFeatures = ["Unlimited active projects", "Branded client portals", "Priority workflow features", "Pro handoff pack", "Everything in Free"];
 
 export default function PricingPage() {
